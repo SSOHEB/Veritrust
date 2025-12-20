@@ -140,46 +140,17 @@ export const Profile: React.FC = () => {
   });
 
   const onSubmit = async (data: ProfileFormData) => {
-    setAiError(null);
-    setAiFeedback(null);
-    setAiLoading(true);
-
     try {
-      const uid = auth.currentUser?.uid;
-      if (!uid) {
-        setAiError("Please sign in to use AI profile feedback.");
-        return;
-      }
-
-      const skills = (data.skills ?? [])
-        .map((s) => s.value)
-        .filter((s) => typeof s === "string" && s.trim() !== "")
-        .join(", ");
-
-      const profileText = [
-        data.title ? `Title: ${data.title}` : "",
-        `Experience: ${data.experience ?? 0} years`,
-        data.education ? `Education: ${data.education}` : "",
-        skills ? `Skills: ${skills}` : "",
-        data.bio ? `Bio: ${data.bio}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
-
-      const functions = getFunctions(app);
-      const callable = httpsCallable<
-        { profileText: string },
-        { strengths: string[]; suggestions: string[]; exampleRewrite: string }
-      >(functions, "generateProfileFeedback");
-
-      const result = await callable({ profileText });
-      setAiFeedback(result.data);
-      setAiFeedbackUpdatedAt(new Date().toLocaleString());
+      // Profile save only (no AI call here)
+      console.log("Profile data:", {
+        ...data,
+        skills: (data.skills ?? [])
+          .map((skill) => skill.value)
+          .filter((skill) => skill.trim() !== ""),
+      });
       setIsEditing(false);
-    } catch {
-      setAiError("AI service is temporarily unavailable. Please try again later.");
-    } finally {
-      setAiLoading(false);
+    } catch (error) {
+      console.error("Error saving profile:", error);
     }
   };
 
@@ -198,6 +169,12 @@ export const Profile: React.FC = () => {
     setAiLoading(true);
 
     try {
+      const uid = auth.currentUser?.uid;
+      if (!uid) {
+        setAiError("Please sign in to use AI profile feedback.");
+        return;
+      }
+
       const values = getValues();
       const skills = (values.skills ?? [])
         .map((s) => s.value)
@@ -599,7 +576,7 @@ export const Profile: React.FC = () => {
               disabled={aiLoading}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all font-semibold disabled:opacity-50"
             >
-              {aiLoading ? "Generating..." : "Get Improvement Suggestions"}
+            {aiLoading ? "Generating..." : "Get AI Profile Feedback"}
             </button>
             <p className="text-xs text-gray-500 mt-2 text-right">
               Suggestions are advisory only. Final profile content is always controlled by the student.
@@ -641,9 +618,9 @@ export const Profile: React.FC = () => {
             <div>
               <h4 className="text-sm font-semibold text-gray-900 mb-2">Example Rewrite</h4>
               <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans">
                   {aiFeedback.exampleRewrite}
-                </p>
+                </pre>
               </div>
             </div>
           </div>
