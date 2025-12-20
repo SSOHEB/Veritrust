@@ -140,17 +140,46 @@ export const Profile: React.FC = () => {
   });
 
   const onSubmit = async (data: ProfileFormData) => {
+    setAiError(null);
+    setAiFeedback(null);
+    setAiLoading(true);
+
     try {
-      // In a real app, this would save to the backend
-      console.log("Profile data:", {
-        ...data,
-        skills: data.skills
-          .map((skill) => skill.value)
-          .filter((skill) => skill.trim() !== ""),
-      });
+      const uid = auth.currentUser?.uid;
+      if (!uid) {
+        setAiError("Please sign in to use AI profile feedback.");
+        return;
+      }
+
+      const skills = (data.skills ?? [])
+        .map((s) => s.value)
+        .filter((s) => typeof s === "string" && s.trim() !== "")
+        .join(", ");
+
+      const profileText = [
+        data.title ? `Title: ${data.title}` : "",
+        `Experience: ${data.experience ?? 0} years`,
+        data.education ? `Education: ${data.education}` : "",
+        skills ? `Skills: ${skills}` : "",
+        data.bio ? `Bio: ${data.bio}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const functions = getFunctions(app);
+      const callable = httpsCallable<
+        { profileText: string },
+        { strengths: string[]; suggestions: string[]; exampleRewrite: string }
+      >(functions, "generateProfileFeedback");
+
+      const result = await callable({ profileText });
+      setAiFeedback(result.data);
+      setAiFeedbackUpdatedAt(new Date().toLocaleString());
       setIsEditing(false);
-    } catch (error) {
-      console.error("Error saving profile:", error);
+    } catch {
+      setAiError("AI service is temporarily unavailable. Please try again later.");
+    } finally {
+      setAiLoading(false);
     }
   };
 
