@@ -1,5 +1,6 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCz3k5ndz7LiiKLp1xyZFTUiE01QdlPFZA",
@@ -13,3 +14,4 @@ const firebaseConfig = {
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const getFirebaseFunctions = () => getFunctions(app);

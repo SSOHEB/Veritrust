@@ -1,132 +1,197 @@
-import { useGlobalContext } from "@/Context/useGlobalContext";
+import React, { useEffect, useMemo, useState } from "react";
 import type { Application, Company } from "@/types";
-import { Clock, CheckCircle, Mail, User, MapPin, Star } from "lucide-react";
-import { useState } from "react";
+import {
+  Clock,
+  CheckCircle,
+  Mail,
+  User,
+  MapPin,
+  Loader,
+  AlertCircle,
+  XCircle,
+} from "lucide-react";
+import { app } from "@/lib/firebase";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 
-// Mock data for applications
-const mockApplications: Application[] = [
+interface ApplicationWithSnapshots {
+  id: string;
+  companyId: string;
+  candidateId: string;
+  jobId: string;
+  status: "pending" | "reviewed" | "accepted" | "rejected";
+  appliedAt: string;
+  candidateSnapshot: {
+    name: string;
+    email: string;
+    skills?: string[];
+    experience?: number;
+  };
+  jobSnapshot: {
+    title: string;
+    companyName: string;
+  };
+}
+
+type StatusKey = "pending" | "reviewed" | "accepted" | "rejected";
+
+const statusConfig: Record<
+  StatusKey,
   {
-    id: "1",
-    jobId: "1",
-    candidateId: "1",
-    job: {
-      id: "1",
-      companyId: "1",
-      title: "Senior Frontend Developer",
-      description: "Looking for an experienced React developer",
-      requirements: ["5+ years React", "TypeScript", "Node.js"],
-      skills: ["React", "TypeScript", "JavaScript"],
-      location: "San Francisco, CA",
-      type: "full-time",
-      salary: { min: 120000, max: 180000, currency: "USD" },
-      postedAt: "2024-01-15",
-      status: "active",
-      company: {} as Company,
-    },
-    candidate: {
-      candidateId: "1",
-      email: "john.doe@example.com",
-      name: "John Doe",
-      description: [
-        "Passionate developer with 6+ years of experience in React and modern web technologies.",
-      ],
-      contacts: ["john.doe@example.com", "+1-555-0123", "San Francisco, CA"],
-      education: ["BS Computer Science"],
-      skills: ["React", "TypeScript", "JavaScript", "Node.js"],
-      resumePath: ["/path/to/resume.pdf"],
-      profileScore: "92",
-    },
-    status: "pending",
-    appliedAt: "2024-01-20",
-    compatibilityScore: 92,
-    aiApplied: false,
+    icon: React.FC<any>;
+    color: string;
+    label: string;
+  }
+> = {
+  pending: {
+    icon: Clock,
+    color: "bg-yellow-100 text-yellow-800",
+    label: "Pending Review",
   },
-  {
-    id: "2",
-    jobId: "2",
-    candidateId: "2",
-    job: {
-      id: "2",
-      companyId: "1",
-      title: "Full Stack Engineer",
-      description: "Full stack position with React and Python",
-      requirements: ["React", "Python", "AWS"],
-      skills: ["React", "Python", "AWS"],
-      location: "Remote",
-      type: "full-time",
-      salary: { min: 100000, max: 150000, currency: "USD" },
-      postedAt: "2024-01-10",
-      status: "active",
-      company: {} as Company,
-    },
-    candidate: {
-      candidateId: "2",
-      email: "jane.smith@example.com",
-      name: "Jane Smith",
-      description: [
-        "Full stack developer with expertise in React and Python backend development.",
-      ],
-      contacts: ["jane.smith@example.com", "+1-555-0456", "New York, NY"],
-      education: ["MS Computer Science"],
-      skills: ["React", "Python", "AWS", "Docker"],
-      resumePath: ["/path/to/resume2.pdf"],
-      profileScore: "88",
-    },
-    status: "accepted",
-    appliedAt: "2024-01-18",
-    compatibilityScore: 88,
-    aiApplied: true,
+  reviewed: {
+    icon: CheckCircle,
+    color: "bg-blue-100 text-blue-800",
+    label: "Reviewed",
   },
-];
+  accepted: {
+    icon: CheckCircle,
+    color: "bg-green-100 text-green-800",
+    label: "Accepted",
+  },
+  rejected: {
+    icon: XCircle,
+    color: "bg-red-100 text-red-800",
+    label: "Rejected",
+  },
+};
 
 export const ApplicationTracking: React.FC = () => {
+  const auth = useMemo(() => getAuth(app), []);
+  const db = useMemo(() => getFirestore(app), []);
+
+  const [applications, setApplications] = useState<ApplicationWithSnapshots[]>(
+    []
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedApplication, setSelectedApplication] =
-    useState<Application | null>(null);
+    useState<ApplicationWithSnapshots | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
 
-  const { companyApplications: companyApplication } = useGlobalContext();
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      try {
+        setError(null);
+        setLoading(true);
 
-  // Mock data
-  const companyApplications = mockApplications;
+        if (!user) {
+          setApplications([]);
+          setError("You must be signed in to view applications.");
+          return;
+        }
 
-  const statusConfig = {
-    pending: {
-      icon: Clock,
-      color: "bg-yellow-100 text-yellow-800",
-      label: "Pending Review",
-    },
-    reviewed: {
-      icon: CheckCircle,
-      color: "bg-blue-100 text-blue-800",
-      label: "Reviewed",
-    },
-    accepted: {
-      icon: Star,
-      color: "bg-green-100 text-green-800",
-      label: "Accepted",
-    },
-    rejected: {
-      icon: User,
-      color: "bg-red-100 text-red-800",
-      label: "Rejected",
-    },
-  };
+        const applicationsRef = collection(db, "applications");
+        const q = query(applicationsRef, where("companyId", "==", user.uid));
+        const snapshot = await getDocs(q);
 
-  const handleStatusUpdate = (
+        const apps: ApplicationWithSnapshots[] = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as ApplicationWithSnapshots[];
+
+        setApplications(apps);
+      } catch (e) {
+        console.error(e);
+        setError("Failed to load applications.");
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => unsub();
+  }, [auth, db]);
+
+  const handleStatusUpdate = async (
     applicationId: string,
-    newStatus: Application["status"]
+    newStatus: StatusKey
   ) => {
-    // Mock function - in real app would update backend
-    console.log(
-      `Updating application ${applicationId} to status: ${newStatus}`
-    );
-    if (selectedApplication && selectedApplication.id === applicationId) {
-      setSelectedApplication({
-        ...selectedApplication,
-        status: newStatus,
-      });
+    try {
+      setUpdating(applicationId);
+      const ref = doc(db, "applications", applicationId);
+      await updateDoc(ref, { status: newStatus });
+
+      setApplications((prev) =>
+        prev.map((app) =>
+          app.id === applicationId ? { ...app, status: newStatus } : app
+        )
+      );
+
+      if (selectedApplication?.id === applicationId) {
+        setSelectedApplication({ ...selectedApplication, status: newStatus });
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to update application status.");
+    } finally {
+      setUpdating(null);
     }
   };
+
+  const filteredApplications =
+    selectedStatus === "all"
+      ? applications
+      : applications.filter((app) => app.status === selectedStatus);
+
+  const getCount = (status: string) => {
+    return applications.filter((app) => app.status === status).length;
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Application Tracking
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Manage and track candidate applications
+          </p>
+        </div>
+        <div className="flex items-center justify-center py-12 bg-white rounded-xl border border-gray-100">
+          <Loader className="w-8 h-8 text-blue-600 animate-spin" />
+          <span className="ml-3 text-gray-600">Loading applications...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Application Tracking
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Manage and track candidate applications
+          </p>
+        </div>
+        <div className="flex items-center justify-center py-12 bg-white rounded-xl border border-red-100">
+          <AlertCircle className="w-8 h-8 text-red-600 mr-3" />
+          <span className="text-red-600">{error}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -152,32 +217,27 @@ export const ApplicationTracking: React.FC = () => {
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            All ({companyApplications.length})
+            All ({applications.length})
           </button>
-          {Object.entries(statusConfig).map(([status, config]) => {
-            const count = companyApplications.filter(
-              (app) => app.status === status
-            ).length;
-            return (
-              <button
-                key={status}
-                onClick={() => setSelectedStatus(status)}
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                  selectedStatus === status
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {config.label} ({count})
-              </button>
-            );
-          })}
+          {Object.entries(statusConfig).map(([status]) => (
+            <button
+              key={status}
+              onClick={() => setSelectedStatus(status)}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                selectedStatus === status
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {statusConfig[status as StatusKey].label} ({getCount(status)})
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Applications List */}
       <div className="space-y-4">
-        {companyApplication && companyApplication.length === 0 ? (
+        {filteredApplications.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
             <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -188,12 +248,9 @@ export const ApplicationTracking: React.FC = () => {
             </p>
           </div>
         ) : (
-          companyApplication &&
-          companyApplication.map((application) => {
-            const StatusIcon = statusConfig[application.status]?.icon || User;
-            const statusStyle =
-              statusConfig[application.status]?.color ||
-              "bg-gray-100 text-gray-800";
+          filteredApplications.map((application) => {
+            const StatusIcon = statusConfig[application.status].icon;
+            const statusStyle = statusConfig[application.status].color;
 
             return (
               <div
@@ -205,19 +262,14 @@ export const ApplicationTracking: React.FC = () => {
                     <div className="flex items-center space-x-4 mb-3">
                       <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
                         <span className="text-white font-semibold">
-                          {application.candidate.name.charAt(0)}
+                          {application.candidateSnapshot.name.charAt(0)}
                         </span>
                       </div>
                       <div>
                         <h3 className="text-xl font-semibold text-gray-900">
-                          {application.candidate.name}
+                          {application.candidateSnapshot.name}
                         </h3>
                       </div>
-                      {application.aiApplied && (
-                        <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
-                          AI Applied
-                        </span>
-                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -225,83 +277,60 @@ export const ApplicationTracking: React.FC = () => {
                         <p className="text-sm font-medium text-gray-700 mb-1">
                           Applied for
                         </p>
-                        <p className="text-gray-900">{application.job.title}</p>
+                        <p className="text-gray-900">
+                          {application.jobSnapshot.title}
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-700 mb-1">
-                          Experience
+                          Email
                         </p>
                         <p className="text-gray-900">
-                          Experience Level:{" "}
-                          {application.candidate.profileScore ||
-                            "Not specified"}
+                          {application.candidateSnapshot.email}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          Location
-                        </p>
-                        <p className="text-gray-900 flex items-center">
-                          <MapPin className="w-4 h-4 mr-1" />
-                          {application.candidate.contacts?.[2] ||
-                            "Location not specified"}
-                        </p>
-                      </div>
+                      {application.candidateSnapshot.experience && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-1">
+                            Experience
+                          </p>
+                          <p className="text-gray-900">
+                            {application.candidateSnapshot.experience} years
+                          </p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm font-medium text-gray-700 mb-1">
                           Applied
                         </p>
                         <p className="text-gray-900">
-                          {new Date(application.appliedAt).toLocaleDateString()}
+                          {new Date(
+                            application.appliedAt
+                          ).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
 
-                    <div className="mb-4">
-                      <p className="text-sm font-medium text-gray-700 mb-2">
-                        Skills
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {application.candidate.skills.map((skill) => (
-                          <span
-                            key={skill}
-                            className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
-                          >
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="flex space-y-6 flex-col mt-4">
-                        <p className="text-md font-bold text-gray-700 mb-2">
-                          Description
-                        </p>
-                        <p className="text-gray-600">
-                          {application.candidate.description?.[0] ||
-                            "No description available"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {application.compatibilityScore && (
-                      <div className="mb-4">
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          Compatibility Score
-                        </p>
-                        <div className="flex items-center space-x-2">
-                          <div className="flex-1 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-green-500 h-2 rounded-full"
-                              style={{
-                                width: `${application.compatibilityScore}%`,
-                              }}
-                            ></div>
+                    {application.candidateSnapshot.skills &&
+                      application.candidateSnapshot.skills.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-sm font-medium text-gray-700 mb-2">
+                            Skills
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {application.candidateSnapshot.skills.map(
+                              (skill) => (
+                                <span
+                                  key={skill}
+                                  className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
+                                >
+                                  {skill}
+                                </span>
+                              )
+                            )}
                           </div>
-                          <span className="text-sm font-medium text-gray-900">
-                            {application.compatibilityScore}%
-                          </span>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
 
                   <div className="ml-6 flex flex-col items-end space-y-3">
@@ -309,8 +338,7 @@ export const ApplicationTracking: React.FC = () => {
                       className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusStyle}`}
                     >
                       <StatusIcon className="w-4 h-4 mr-1" />
-                      {statusConfig[application.status]?.label ||
-                        application.status}
+                      {statusConfig[application.status].label}
                     </span>
 
                     <div className="flex flex-col space-y-2">
@@ -320,17 +348,21 @@ export const ApplicationTracking: React.FC = () => {
                             onClick={() =>
                               handleStatusUpdate(application.id, "reviewed")
                             }
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                            disabled={updating === application.id}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm disabled:opacity-50"
                           >
-                            Mark as Reviewed
+                            {updating === application.id
+                              ? "Updating..."
+                              : "Mark as Reviewed"}
                           </button>
                           <button
                             onClick={() =>
                               handleStatusUpdate(application.id, "rejected")
                             }
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                            disabled={updating === application.id}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm disabled:opacity-50"
                           >
-                            Reject
+                            {updating === application.id ? "Updating..." : "Reject"}
                           </button>
                         </>
                       )}
@@ -341,17 +373,19 @@ export const ApplicationTracking: React.FC = () => {
                             onClick={() =>
                               handleStatusUpdate(application.id, "accepted")
                             }
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                            disabled={updating === application.id}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm disabled:opacity-50"
                           >
-                            Accept
+                            {updating === application.id ? "Updating..." : "Accept"}
                           </button>
                           <button
                             onClick={() =>
                               handleStatusUpdate(application.id, "rejected")
                             }
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                            disabled={updating === application.id}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm disabled:opacity-50"
                           >
-                            Reject
+                            {updating === application.id ? "Updating..." : "Reject"}
                           </button>
                         </>
                       )}
@@ -391,20 +425,15 @@ export const ApplicationTracking: React.FC = () => {
               <div className="flex items-center space-x-4">
                 <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
                   <span className="text-white font-semibold text-xl">
-                    {selectedApplication.candidate.name.charAt(0)}
+                    {selectedApplication.candidateSnapshot.name.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <h3 className="text-2xl font-semibold text-gray-900">
-                    {selectedApplication.candidate.name}
+                    {selectedApplication.candidateSnapshot.name}
                   </h3>
-                  <p className="text-gray-600">
-                    {selectedApplication.candidate.description?.[0] ||
-                      "No description"}
-                  </p>
                   <p className="text-sm text-gray-500">
-                    {selectedApplication.candidate.email ||
-                      selectedApplication.candidate.contacts?.[0]}
+                    {selectedApplication.candidateSnapshot.email}
                   </p>
                 </div>
               </div>
@@ -412,92 +441,71 @@ export const ApplicationTracking: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-700 mb-1">
-                    Experience
+                    Applied for
                   </p>
                   <p className="text-gray-900">
-                    Profile Score:{" "}
-                    {selectedApplication.candidate.profileScore ||
-                      "Not specified"}
+                    {selectedApplication.jobSnapshot.title}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-700 mb-1">
-                    Education
+                    Company
                   </p>
                   <p className="text-gray-900">
-                    {selectedApplication.candidate.education?.[0] ||
-                      "Not specified"}
+                    {selectedApplication.jobSnapshot.companyName}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-700 mb-1">
-                    Location
+                    Email
                   </p>
                   <p className="text-gray-900">
-                    {selectedApplication.candidate.contacts?.[2] ||
-                      "Not specified"}
+                    {selectedApplication.candidateSnapshot.email}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-700 mb-1">
-                    Phone
+                    Applied Date
                   </p>
                   <p className="text-gray-900">
-                    {selectedApplication.candidate.contacts?.[1] ||
-                      "Not provided"}
+                    {new Date(
+                      selectedApplication.appliedAt
+                    ).toLocaleDateString()}
                   </p>
                 </div>
               </div>
 
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </p>
-                <p className="text-gray-900">
-                  {selectedApplication.candidate.description?.[0] ||
-                    "No description available"}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">Skills</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedApplication.candidate.skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {selectedApplication.compatibilityScore && (
+              {selectedApplication.candidateSnapshot.experience && (
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">
-                    AI Compatibility Analysis
+                  <p className="text-sm font-medium text-gray-700 mb-1">
+                    Years of Experience
                   </p>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600">
-                        Overall Match
-                      </span>
-                      <span className="text-lg font-semibold text-gray-900">
-                        {selectedApplication.compatibilityScore}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-green-500 h-2 rounded-full"
-                        style={{
-                          width: `${selectedApplication.compatibilityScore}%`,
-                        }}
-                      ></div>
-                    </div>
-                  </div>
+                  <p className="text-gray-900">
+                    {selectedApplication.candidateSnapshot.experience} years
+                  </p>
                 </div>
               )}
+
+              {selectedApplication.candidateSnapshot.skills &&
+                selectedApplication.candidateSnapshot.skills.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      Skills
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedApplication.candidateSnapshot.skills.map(
+                        (skill) => (
+                          <span
+                            key={skill}
+                            className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full"
+                          >
+                            {skill}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
             </div>
 
             <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">

@@ -13,9 +13,12 @@ import {
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { auth } from "@/lib/firebase";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { app } from "@/lib/firebase";
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   getFirestore,
   query,
@@ -52,6 +55,7 @@ const getCompatibilityScore = (job: any, candidate: any): number => {
 };
 
 export const JobSearch: React.FC = () => {
+  const authInstance = useMemo(() => getAuth(app), []);
   const db = useMemo(() => getFirestore(), []);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,15 +68,27 @@ export const JobSearch: React.FC = () => {
   const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-
-  const candidate = temporaryCandidate;
+  const [candidate, setCandidate] = useState<any>(temporaryCandidate);
+  const [candidateVerified, setCandidateVerified] = useState(false);
 
   useEffect(() => {
-    const run = async () => {
+    const unsub = onAuthStateChanged(authInstance, async (user) => {
       try {
         setError(null);
         setLoading(true);
 
+        // Load candidate profile and verification status
+        if (user) {
+          const candidateRef = doc(db, "users", user.uid);
+          const candidateSnap = await getDoc(candidateRef);
+          if (candidateSnap.exists()) {
+            const candidateData = candidateSnap.data();
+            setCandidate(candidateData);
+            setCandidateVerified(Boolean(candidateData?.verified));
+          }
+        }
+
+        // Load active jobs
         const qJobs = query(collection(db, "jobs"), where("status", "==", "active"));
         const snap = await getDocs(qJobs);
         const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -83,10 +99,10 @@ export const JobSearch: React.FC = () => {
       } finally {
         setLoading(false);
       }
-    };
+    });
 
-    run();
-  }, [db]);
+    return () => unsub();
+  }, [db, authInstance]);
 
   const filteredJobs = jobs.filter((job) => {
     const title = String(job.title || "").toLowerCase();
@@ -118,6 +134,11 @@ export const JobSearch: React.FC = () => {
         return;
       }
 
+      if (!candidateVerified) {
+        setError("You must verify your profile before applying. Visit your profile to get verified.");
+        return;
+      }
+
       if (appliedJobIds.includes(job.id)) return;
 
       setApplyingJobId(job.id);
@@ -127,6 +148,7 @@ export const JobSearch: React.FC = () => {
       const payload = {
         id: applicationId,
         candidateId: user.uid,
+        companyId: job.companyId,
         jobId: job.id,
         appliedAt: new Date().toISOString(),
         status: "pending" as const,
