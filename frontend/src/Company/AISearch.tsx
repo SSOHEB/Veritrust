@@ -11,6 +11,44 @@ import {
   Download,
 } from "lucide-react";
 
+const searchCandidates = (query: string, _companyId: string): Candidate[] => {
+  const q = query.toLowerCase();
+
+  const all: Candidate[] = [
+    {
+      id: "cand_1",
+      email: "alex@example.com",
+      name: "Alex Johnson",
+      type: "candidate",
+      createdAt: new Date().toISOString(),
+      title: "Senior Frontend Developer",
+      experience: 6,
+      location: "San Francisco, CA",
+      education: "BS Computer Science",
+      skills: ["React", "TypeScript", "Next.js"],
+      bio: "Frontend engineer focused on high-quality UI systems.",
+    },
+    {
+      id: "cand_2",
+      email: "priya@example.com",
+      name: "Priya Patel",
+      type: "candidate",
+      createdAt: new Date().toISOString(),
+      title: "Full Stack Developer",
+      experience: 4,
+      location: "Remote",
+      education: "MS Software Engineering",
+      skills: ["React", "Node.js", "PostgreSQL"],
+      bio: "Full stack dev building reliable web apps end-to-end.",
+    },
+  ];
+
+  return all.filter((c) => {
+    const haystack = `${c.name} ${c.title || ""} ${(c.skills || []).join(" ")} ${c.location || ""}`.toLowerCase();
+    return haystack.includes(q);
+  });
+};
+
 export const AISearch: React.FC = () => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Candidate[]>([]);

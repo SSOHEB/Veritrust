@@ -19,8 +19,6 @@ import {
   custom,
   formatEther,
   type Hex,
-  type PublicClient,
-  type WalletClient,
 } from "viem";
 import { contractAbi } from "@/lib/contractAbi";
 import { JobStatus, JobType, LocationType } from "@/lib/utils";
@@ -66,12 +64,8 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
   const { wallets } = useWallets();
   const { ready, user } = usePrivy();
 
-  const [jobPublicClient, setJobPublicClient] = useState<
-    PublicClient | undefined
-  >();
-  const [jobWalletClient, setJobWalletClient] = useState<
-    WalletClient | undefined
-  >();
+  const [jobPublicClient, setJobPublicClient] = useState<any>();
+  const [jobWalletClient, setJobWalletClient] = useState<any>();
 
   const [companyApplications, setCompanyApplications] = useState<
     CompanyApplicationInterface[]

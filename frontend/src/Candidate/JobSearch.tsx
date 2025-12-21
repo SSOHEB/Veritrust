@@ -1,11 +1,5 @@
-import React, { useEffect, useState } from "react";
-import type {
-  Candidate,
-  Application,
-  Job,
-  Company,
-  ContractJob,
-} from "../types";
+import React, { useEffect, useMemo, useState } from "react";
+import type { Candidate } from "../types";
 import {
   Search,
   MapPin,
@@ -17,15 +11,22 @@ import {
   Briefcase,
   CheckCircle,
 } from "lucide-react";
-import { useGlobalContext } from "@/Context/useGlobalContext";
-import { usePrivy } from "@privy-io/react-auth";
-import { contractAbi } from "@/lib/contractAbi";
-import type { Hex } from "viem";
-import { JobStatus, JobType, LocationType } from "@/lib/utils";
+import { v4 as uuidv4 } from "uuid";
+import { auth } from "@/lib/firebase";
+import {
+  collection,
+  doc,
+  getDocs,
+  getFirestore,
+  query,
+  setDoc,
+  where,
+} from "firebase/firestore";
 
 // Mock candidate data
-const mockCandidate: Candidate = {
-  id: "2",
+// Will be replaced with real candidate data in Phase 3 Part-2
+const temporaryCandidate: Candidate = {
+  id: "temp_candidate",
   email: "john.developer@example.com",
   name: "John Developer",
   type: "candidate",
@@ -39,271 +40,137 @@ const mockCandidate: Candidate = {
   phone: "+1-555-0123",
 };
 
-// Mock data
-const mockApplications: Application[] = [
-  {
-    id: "1",
-    jobId: "1",
-    candidateId: "2",
-    job: {} as Job,
-    candidate: {} as Candidate,
-    status: "pending",
-    appliedAt: "2024-01-15",
-    compatibilityScore: 85,
-    aiApplied: false,
-  },
-];
+const getCompatibilityScore = (job: any, candidate: any): number => {
+  const jobSkills = (job.skills || []).map((s: string) => String(s).toLowerCase());
+  const candidateSkills = (candidate?.skills || []).map((s: string) => String(s).toLowerCase());
 
-const mockJobs: Job[] = [
-  {
-    id: "1",
-    companyId: "1",
-    company: {
-      id: "1",
-      name: "Tech Innovators Inc",
-      companyName: "Tech Innovators Inc",
-      industry: "Technology",
-      size: "100-500",
-      description: "Leading AI and software development company",
-    } as Company,
-    title: "Senior Frontend Developer",
-    description:
-      "We are looking for a skilled Frontend Developer to join our team and help build next-generation web applications. You'll work with cutting-edge technologies and collaborate with talented engineers.",
-    requirements: [
-      "5+ years React experience",
-      "TypeScript proficiency",
-      "UI/UX design skills",
-    ],
-    skills: ["React", "TypeScript", "JavaScript", "CSS", "HTML"],
-    location: "San Francisco, CA",
-    type: "full-time",
-    salary: { min: 120000, max: 180000, currency: "USD" },
-    postedAt: "2024-01-10",
-    status: "active",
-  },
-  {
-    id: "2",
-    companyId: "1",
-    company: {
-      id: "1",
-      name: "AI Startup",
-      companyName: "AI Startup",
-      industry: "Technology",
-      size: "50-100",
-      description: "Cutting-edge AI company",
-    } as Company,
-    title: "ML Engineer",
-    description:
-      "Join our team to build cutting-edge machine learning models. Work on exciting AI projects that will shape the future of technology.",
-    requirements: [
-      "Python",
-      "TensorFlow",
-      "3+ years experience",
-      "PhD preferred",
-    ],
-    skills: [
-      "Python",
-      "TensorFlow",
-      "Machine Learning",
-      "PyTorch",
-      "Statistics",
-    ],
-    location: "Remote",
-    type: "full-time",
-    salary: { min: 130000, max: 200000, currency: "USD" },
-    postedAt: "2024-01-12",
-    status: "active",
-  },
-  {
-    id: "3",
-    companyId: "2",
-    company: {
-      id: "2",
-      name: "StartupCo",
-      companyName: "StartupCo",
-      industry: "Technology",
-      size: "10-50",
-      description: "Fast-growing startup",
-    } as Company,
-    title: "Full Stack Engineer",
-    description:
-      "Build scalable web applications using modern technologies. Work in a fast-paced startup environment with lots of growth opportunities.",
-    requirements: ["JavaScript", "Node.js", "React", "3+ years experience"],
-    skills: ["JavaScript", "Node.js", "React", "PostgreSQL", "AWS"],
-    location: "New York, NY",
-    type: "full-time",
-    salary: { min: 100000, max: 150000, currency: "USD" },
-    postedAt: "2024-01-14",
-    status: "active",
-  },
-];
+  if (jobSkills.length === 0) return 50;
 
-// Mock functions
-const getCompatibilityScore = (job: Job, candidate: Candidate): number => {
-  // Simple compatibility algorithm based on skills overlap
-  const jobSkills = job.skills.map((s) => s.toLowerCase());
-  const candidateSkills = candidate?.skills?.map((s) => s.toLowerCase()) || [];
-
-  const overlap = jobSkills.filter((skill) =>
-    candidateSkills.includes(skill)
-  ).length;
+  const overlap = jobSkills.filter((skill: string) => candidateSkills.includes(skill)).length;
   const score = Math.min(95, Math.max(20, (overlap / jobSkills.length) * 100));
-
   return Math.round(score);
 };
 
-const applyToJob = (jobId: string, candidateId: string, aiApplied = false) => {
-  console.log(
-    `Applied to job ${jobId} for candidate ${candidateId}, AI Applied: ${aiApplied}`
-  );
-  // In a real app, this would make an API call
-};
-
 export const JobSearch: React.FC = () => {
+  const db = useMemo(() => getFirestore(), []);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const { jobWalletClient, jobPublicClient, contractAddress } =
-    useGlobalContext();
-  const { user } = usePrivy();
 
-  const candidate = mockCandidate;
-  const candidateApplications = mockApplications.filter(
-    (app: Application) => app.candidateId === candidate.id
-  );
-  const appliedJobIds = candidateApplications.map(
-    (app: Application) => app.jobId
-  );
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
+  const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredJobs = jobs.filter((job: Job) => {
+  const candidate = temporaryCandidate;
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        setError(null);
+        setLoading(true);
+
+        const qJobs = query(collection(db, "jobs"), where("status", "==", "active"));
+        const snap = await getDocs(qJobs);
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setJobs(list);
+      } catch (e) {
+        console.error(e);
+        setError("Failed to load jobs.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    run();
+  }, [db]);
+
+  const filteredJobs = jobs.filter((job) => {
+    const title = String(job.title || "").toLowerCase();
+    const description = String(job.description || "").toLowerCase();
+    const companyName = String(job.companySnapshot?.name || "").toLowerCase();
+
     const matchesSearch =
-      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (job.company?.companyName || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
+      title.includes(searchTerm.toLowerCase()) ||
+      description.includes(searchTerm.toLowerCase()) ||
+      companyName.includes(searchTerm.toLowerCase());
 
     const matchesLocation =
       !locationFilter ||
-      job.location.toLowerCase().includes(locationFilter.toLowerCase());
+      String(job.location || "")
+        .toLowerCase()
+        .includes(locationFilter.toLowerCase());
 
     const matchesType = typeFilter === "all" || job.type === typeFilter;
 
     return matchesSearch && matchesLocation && matchesType;
   });
 
-  const handleApply = (jobId: string) => {
-    applyToJob(jobId, candidate.id, false);
+  const handleApply = async (job: any) => {
+    try {
+      setError(null);
+      const user = auth.currentUser;
+      if (!user) {
+        setError("You must be signed in to apply.");
+        return;
+      }
+
+      if (appliedJobIds.includes(job.id)) return;
+
+      setApplyingJobId(job.id);
+
+      const applicationId = uuidv4();
+
+      const payload = {
+        id: applicationId,
+        candidateId: user.uid,
+        jobId: job.id,
+        appliedAt: new Date().toISOString(),
+        status: "pending" as const,
+        candidateSnapshot: {
+          id: user.uid,
+          email: user.email || candidate.email,
+          name: user.displayName || candidate.name,
+          ...candidate,
+        },
+        jobSnapshot: {
+          id: job.id,
+          companyId: job.companyId,
+          title: job.title,
+          location: job.location,
+          type: job.type,
+          companySnapshot: job.companySnapshot || null,
+          salary: job.salary || null,
+        },
+      };
+
+      await setDoc(doc(db, "applications", applicationId), payload);
+
+      setAppliedJobIds((prev) => [...prev, job.id]);
+    } catch (e) {
+      console.error(e);
+      setError("Failed to apply. Please try again.");
+    } finally {
+      setApplyingJobId(null);
+    }
   };
 
-  useEffect(() => {
-    if (!jobWalletClient) return;
-    if (!jobPublicClient) return;
-    if (!user) return;
-
-    (async function () {
-      try {
-        const jobs = await jobPublicClient.readContract({
-          address: contractAddress as Hex,
-          abi: contractAbi,
-          functionName: "getAllJobs",
-          args: [],
-        });
-
-        console.log("Fetched jobs from contract:", jobs);
-
-        const filteredContractJobs = (jobs as ContractJob[]).filter(
-          (job) =>
-            job.companyId !== user.google?.email || job.companyId !== user.id
-        ); // exclude jobs for this company - candidates should see other companies' jobs
-
-        // Get unique company IDs to fetch company information
-        const uniqueCompanyIds = [
-          ...new Set(filteredContractJobs.map((job) => job.companyId)),
-        ];
-
-        // Fetch company information for each unique company
-        const companyInfoMap = new Map();
-        for (const companyId of uniqueCompanyIds) {
-          try {
-            const companyInfo = await jobPublicClient.readContract({
-              address: contractAddress as Hex,
-              abi: contractAbi,
-              functionName: "getCompany",
-              args: [companyId],
-            });
-            companyInfoMap.set(companyId, companyInfo);
-          } catch (error) {
-            console.error(
-              `Error fetching company info for ${companyId}:`,
-              error
-            );
-            // Set fallback company info if contract call fails
-            companyInfoMap.set(companyId, {
-              name: "TechCorp Inc",
-              industry: "Technology",
-              size: "100-500",
-              description:
-                "Innovative technology company focused on cutting-edge solutions",
-            });
-          }
-        }
-
-        const parsedJobs = filteredContractJobs.map((job) => {
-          const companyInfo = companyInfoMap.get(job.companyId) || {};
-
-          return {
-            id: job.jobId,
-            companyId: job.companyId,
-            company: {
-              id: job.companyId,
-              name: companyInfo.name || "TechCorp Inc",
-              companyName: companyInfo.name || "TechCorp Inc",
-              industry: companyInfo.industry || "Technology",
-              size: companyInfo.size || "100-500",
-              description:
-                companyInfo.description ||
-                "Innovative technology company focused on cutting-edge solutions",
-            } as Company,
-            title: job.title,
-            description: job.description,
-            requirements: job.requirements,
-            skills: job.skills,
-            location: LocationType[job.location], // map enum index → string
-            type: JobType[job.jobType], // map enum index → string
-            salary: {
-              min: Number(job.salaryRange?.[0] || 0),
-              max: Number(job.salaryRange?.[1] || 0),
-              currency: "USD",
-            },
-            postedAt: new Date().toISOString(),
-            status: JobStatus[job.status], // map enum index → string
-          };
-        });
-
-        console.log(parsedJobs, "loggggg");
-
-        setJobs(parsedJobs);
-      } catch (err) {
-        console.error("Error fetching jobs:", err);
-      }
-    })();
-  }, [jobWalletClient, jobPublicClient, contractAddress, user]);
+  if (loading) {
+    return <div className="text-gray-600">Loading…</div>;
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Find Your Next Opportunity
-        </h1>
-        <p className="text-gray-600 mt-1">
-          Discover jobs that match your skills and preferences
-        </p>
+        <h1 className="text-2xl font-bold text-gray-900">Find Your Next Opportunity</h1>
+        <p className="text-gray-600 mt-1">Discover jobs that match your skills and preferences</p>
       </div>
 
-      {/* Search and Filters */}
+      {error ? <div className="text-sm text-red-600">{error}</div> : null}
+
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div className="space-y-4">
           <div className="flex space-x-4">
@@ -347,66 +214,57 @@ export const JobSearch: React.FC = () => {
                 <option value="full-time">Full-time</option>
                 <option value="part-time">Part-time</option>
                 <option value="contract">Contract</option>
-                <option value="remote">Remote</option>
+                <option value="internship">Internship</option>
+                <option value="freelance">Freelance</option>
               </select>
             </div>
           )}
         </div>
       </div>
 
-      {/* Results Summary */}
       <div className="flex items-center justify-between">
         <p className="text-gray-600">{filteredJobs.length} jobs found</p>
-        <div className="flex space-x-2 text-sm text-gray-600">
-          <span>Sort by:</span>
-          <button className="text-blue-600 hover:text-blue-700">
-            Relevance
-          </button>
-          <span>•</span>
-          <button className="text-gray-600 hover:text-blue-600">Date</button>
-          <span>•</span>
-          <button className="text-gray-600 hover:text-blue-600">Salary</button>
-        </div>
       </div>
 
-      {/* Job Listings */}
       <div className="space-y-4">
-        {filteredJobs.map((job: Job) => {
+        {filteredJobs.map((job) => {
           const compatibilityScore = getCompatibilityScore(job, candidate);
           const hasApplied = appliedJobIds.includes(job.id);
+          const isVerifiedCompany = Boolean(job.companySnapshot?.verified);
 
           return (
-            <div
-              key={job.id}
-              className="bg-white p-6 rounded-xl shadow-sm border border-gray-100"
-            >
+            <div key={job.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-start space-x-4">
                     <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
                       <Building2 className="w-6 h-6 text-gray-600" />
                     </div>
+
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-xl font-semibold text-gray-900">
-                          {job.title}
-                        </h3>
+                        <h3 className="text-xl font-semibold text-gray-900">{job.title}</h3>
                         <div className="flex items-center space-x-1 bg-green-100 text-green-800 px-2 py-1 rounded-full">
                           <Star className="w-4 h-4" />
-                          <span className="text-sm font-medium">
-                            {compatibilityScore}% match
-                          </span>
+                          <span className="text-sm font-medium">{compatibilityScore}% match</span>
                         </div>
+                        {isVerifiedCompany ? (
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-emerald-100 text-emerald-800">
+                            Verified Company
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="flex items-center space-x-2 mb-3">
                         <h4 className="text-lg font-medium text-gray-700">
-                          {job.company?.companyName || "TechCorp Inc"}
+                          {job.companySnapshot?.name || "Company"}
                         </h4>
-                        <span className="text-gray-400">•</span>
-                        <span className="text-gray-600">
-                          {job.company?.industry || "Technology"}
-                        </span>
+                        {job.companySnapshot?.industry ? (
+                          <>
+                            <span className="text-gray-400">•</span>
+                            <span className="text-gray-600">{job.companySnapshot.industry}</span>
+                          </>
+                        ) : null}
                       </div>
 
                       <div className="flex items-center space-x-6 text-sm text-gray-600 mb-4">
@@ -414,37 +272,32 @@ export const JobSearch: React.FC = () => {
                           <MapPin className="w-4 h-4" />
                           <span>{job.location}</span>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <DollarSign className="w-4 h-4" />
-                          <span>
-                            ${job.salary.min.toLocaleString()} - $
-                            {job.salary.max.toLocaleString()}
-                          </span>
-                        </div>
+                        {job.salary?.min != null && job.salary?.max != null ? (
+                          <div className="flex items-center space-x-1">
+                            <DollarSign className="w-4 h-4" />
+                            <span>
+                              ${Number(job.salary.min).toLocaleString()} - ${Number(job.salary.max).toLocaleString()}
+                            </span>
+                          </div>
+                        ) : null}
                         <div className="flex items-center space-x-1">
                           <Briefcase className="w-4 h-4" />
-                          <span className="capitalize">
-                            {job.type.replace("-", " ")}
-                          </span>
+                          <span className="capitalize">{String(job.type || "").replace("-", " ")}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Calendar className="w-4 h-4" />
-                          <span>
-                            {new Date(job.postedAt).toLocaleDateString()}
-                          </span>
+                          <span>{new Date(job.postedAt).toLocaleDateString()}</span>
                         </div>
                       </div>
 
-                      <p className="text-gray-600 mb-4 line-clamp-2">
-                        {job.description}
-                      </p>
+                      <p className="text-gray-600 mb-4 line-clamp-2">{job.description}</p>
 
                       <div className="flex flex-wrap gap-2 mb-4">
-                        {job.skills.map((skill: string) => (
+                        {(job.skills || []).map((skill: string) => (
                           <span
                             key={skill}
                             className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              candidate.skills.includes(skill)
+                              (candidate.skills || []).includes(skill)
                                 ? "bg-green-100 text-green-800"
                                 : "bg-gray-100 text-gray-700"
                             }`}
@@ -452,34 +305,6 @@ export const JobSearch: React.FC = () => {
                             {skill}
                           </span>
                         ))}
-                      </div>
-
-                      {/* Compatibility Analysis */}
-                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-blue-900">
-                            Match Analysis
-                          </span>
-                          <span className="text-sm font-semibold text-blue-900">
-                            {compatibilityScore}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-blue-200 rounded-full h-2 mb-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full"
-                            style={{ width: `${compatibilityScore}%` }}
-                          ></div>
-                        </div>
-                        <p className="text-xs text-blue-800">
-                          You match{" "}
-                          {
-                            job.skills.filter(
-                              (skill: string) =>
-                                candidate?.skills?.includes(skill) || false
-                            ).length
-                          }{" "}
-                          out of {job.skills.length} required skills
-                        </p>
                       </div>
                     </div>
                   </div>
@@ -493,20 +318,13 @@ export const JobSearch: React.FC = () => {
                     </div>
                   ) : (
                     <button
-                      onClick={() => handleApply(job.id)}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all font-semibold"
+                      onClick={() => handleApply(job)}
+                      disabled={applyingJobId === job.id}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all font-semibold disabled:opacity-50"
                     >
-                      Apply Now
+                      {applyingJobId === job.id ? "Applying..." : "Apply Now"}
                     </button>
                   )}
-
-                  <button className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                    Save Job
-                  </button>
-
-                  <button className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                    View Details
-                  </button>
                 </div>
               </div>
             </div>
@@ -516,12 +334,8 @@ export const JobSearch: React.FC = () => {
         {filteredJobs.length === 0 && (
           <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
             <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              No jobs found
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Try adjusting your search criteria or location filters
-            </p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No jobs found</h3>
+            <p className="text-gray-600 mb-4">Try adjusting your search criteria or location filters</p>
             <button
               onClick={() => {
                 setSearchTerm("");

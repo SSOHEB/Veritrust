@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Company, ContractJob, Job } from "../types";
 import { v4 as uuidv4 } from "uuid";
 import {
   Dialog,
@@ -12,16 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import {
-  Plus,
-  Edit,
-  Eye,
-  MapPin,
-  DollarSign,
-  Calendar,
-  Users,
-  Briefcase,
-} from "lucide-react";
+import { Plus, MapPin, DollarSign, Calendar, Briefcase } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,123 +20,49 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { useGlobalContext } from "@/Context/useGlobalContext";
-import { contractAbi } from "@/lib/contractAbi";
-import type { Hex } from "viem";
-import { flowTestnet } from "viem/chains";
-import { usePrivy } from "@privy-io/react-auth";
+import { auth } from "@/lib/firebase";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  orderBy,
+  query,
+  setDoc,
+  where,
+} from "firebase/firestore";
 
-// Mock data
-const mockCompany: Company = {
-  id: "1",
-  email: "company@techinnovators.com",
-  name: "Tech Innovators Inc",
-  type: "company",
-  createdAt: "2015-01-01",
-  companyName: "Tech Innovators Inc",
-  industry: "Technology",
-  size: "100-500",
-  description: "Leading AI and software development company",
-  website: "https://www.techinnovators.com",
-  logo: "",
-};
-
-const mockJobs: Job[] = [
-  {
-    id: "1",
-    companyId: "1",
-    title: "Senior Frontend Developer",
-    description:
-      "We are looking for a skilled Frontend Developer to join our team and help build next-generation web applications.",
-    requirements: [
-      "5+ years React experience",
-      "TypeScript proficiency",
-      "UI/UX design skills",
-    ],
-    skills: [""],
-    location: "San Francisco, CA",
-    type: "full-time",
-    salary: { min: 120000, max: 180000, currency: "USD" },
-    postedAt: "2024-01-15",
-    status: "active",
-  },
-  {
-    id: "2",
-    companyId: "1",
-    title: "AI/ML Engineer",
-    description:
-      "Join our AI team to develop cutting-edge machine learning models and AI-powered solutions.",
-    requirements: [
-      "PhD or Masters in AI/ML",
-      "Python expertise",
-      "Deep Learning frameworks",
-    ],
-    skills: ["Python", "TensorFlow", "PyTorch", "Machine Learning", "AI"],
-    location: "Remote",
-    type: "full-time",
-    salary: { min: 150000, max: 220000, currency: "USD" },
-    postedAt: "2024-01-10",
-    status: "active",
-  },
-];
-
-const mockApplications = [
-  { id: "1", jobId: "1" },
-  { id: "2", jobId: "1" },
-  { id: "3", jobId: "1" },
-];
-
-const jobTypeMapping: Record<string, bigint> = {
-  "full-time": BigInt(0),
-  "part-time": BigInt(1),
-  contract: BigInt(2),
-  internship: BigInt(3),
-  freelance: BigInt(4),
-};
-
-const locationTypeMapping: Record<string, bigint> = {
-  Remote: BigInt(0),
-  Hybrid: BigInt(1),
-  Onsite: BigInt(2),
-};
-
-// Form validation schema
 const jobFormSchema = z.object({
   title: z.string().min(1, "Job title is required"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   requirements: z.string().optional(),
   skills: z.string().optional(),
   location: z.enum(["Remote", "Hybrid", "Onsite"]),
-  type: z.enum([
-    "full-time",
-    "part-time",
-    "contract",
-    "internship",
-    "freelance",
-  ]),
+  type: z.enum(["full-time", "part-time", "contract", "internship", "freelance"]),
   salaryMin: z.string().refine((val) => !val || !isNaN(Number(val)), {
     message: "Must be a valid number",
   }),
   salaryMax: z.string().refine((val) => !val || !isNaN(Number(val)), {
     message: "Must be a valid number",
   }),
-  status: z.enum(["active", "closed", "draft"]),
+  status: z.enum(["active", "closed"]),
 });
 
 type JobFormData = z.infer<typeof jobFormSchema>;
 
 export const JobManagement: React.FC = () => {
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const {
-    jobWalletClient,
-    contractAddress,
-    jobPublicClient,
-    job: companyJobs,
-  } = useGlobalContext();
+  const db = useMemo(() => getFirestore(), []);
 
-  const { user } = usePrivy();
-  console.log("user from privy", user);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [companyVerified, setCompanyVerified] = useState<boolean>(false);
+  const [companySnapshot, setCompanySnapshot] = useState<any | null>(null);
+
   const form = useForm<JobFormData>({
     resolver: zodResolver(jobFormSchema),
     defaultValues: {
@@ -161,109 +78,170 @@ export const JobManagement: React.FC = () => {
     },
   });
 
-  const company = mockCompany;
-  // const companyJobs = mockJobs;
-  const applications = mockApplications;
+  useEffect(() => {
+    const run = async () => {
+      try {
+        setError(null);
+        setLoading(true);
 
-  const onSubmit = (data: JobFormData) => {
-    if (!jobWalletClient) return;
-    if (!jobPublicClient) return;
-    if (!user) return;
+        const user = auth.currentUser;
+        if (!user) {
+          setJobs([]);
+          setCompanyVerified(false);
+          setCompanySnapshot(null);
+          setError("You must be signed in to manage jobs.");
+          return;
+        }
 
-    const jobId = uuidv4();
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.exists() ? userSnap.data() : {};
+        const verified = Boolean((userData as any)?.verified);
 
-    console.log("Submitting job:", jobId, data);
+        setCompanyVerified(verified);
+        setCompanySnapshot({
+          name: (userData as any)?.companyName || user.displayName || "Company",
+          industry: (userData as any)?.industry || "",
+          logo: (userData as any)?.logo || "",
+          verified,
+        });
 
-    (async function () {
-      const [account] = await jobWalletClient.getAddresses();
-      const tx = await jobWalletClient.writeContract({
-        address: contractAddress as Hex,
-        abi: contractAbi,
-        functionName: "postJob",
-        args: [
-          jobId,
-          company.id,
-          data.title,
-          data.description,
-          [data.requirements],
-          [data.skills],
-          locationTypeMapping[data.location], // Use the mapping here
-          [data.salaryMin, data.salaryMax],
-          jobTypeMapping[data.type],
-        ],
-        account,
-        chain: flowTestnet,
-      });
+        const qJobs = query(
+          collection(db, "jobs"),
+          where("companyId", "==", user.uid),
+          orderBy("postedAt", "desc")
+        );
 
-      await jobPublicClient.waitForTransactionReceipt({
-        hash: tx,
-      });
+        const snap = await getDocs(qJobs);
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setJobs(list);
+      } catch (e) {
+        console.error(e);
+        setError("Failed to load jobs.");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      const jobs = await jobPublicClient.readContract({
-        address: contractAddress as Hex,
-        abi: contractAbi,
-        functionName: "getJob",
-        args: [user.id],
-      });
+    run();
+  }, [db]);
 
-      //      {
-      //   id: "2",
-      //   companyId: "1",
-      //   company: mockCompany,
-      //   title: "AI/ML Engineer",
-      //   description:
-      //     "Join our AI team to develop cutting-edge machine learning models and AI-powered solutions.",
-      //   requirements: [
-      //     "PhD or Masters in AI/ML",
-      //     "Python expertise",
-      //     "Deep Learning frameworks",
-      //   ],
-      //   skills: ["Python", "TensorFlow", "PyTorch", "Machine Learning", "AI"],
-      //   location: "Remote",
-      //   type: "full-time",
-      //   salary: { min: 150000, max: 220000, currency: "USD" },
-      //   postedAt: "2024-01-10",
-      //   status: "active",
-      // },
+  const parseLines = (value?: string) =>
+    (value || "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-      console.log("Job posted on-chain with tx:", tx);
-    })();
+  const parseCsv = (value?: string) =>
+    (value || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  const onSubmit = async (data: JobFormData) => {
+    try {
+      setError(null);
+      setSubmitting(true);
+
+      const user = auth.currentUser;
+      if (!user) {
+        setError("You must be signed in to post a job.");
+        return;
+      }
+
+      if (!companyVerified) {
+        setError("Your company must be verified before posting jobs.");
+        return;
+      }
+
+      const jobId = uuidv4();
+
+      const newJob = {
+        id: jobId,
+        companyId: user.uid,
+        title: data.title,
+        description: data.description,
+        requirements: parseLines(data.requirements),
+        skills: parseCsv(data.skills),
+        location: data.location,
+        type: data.type,
+        salary: {
+          min: Number(data.salaryMin || 0),
+          max: Number(data.salaryMax || 0),
+          currency: "USD",
+        },
+        postedAt: new Date().toISOString(),
+        status: data.status,
+        immutable: true,
+        companySnapshot: companySnapshot || {
+          name: user.displayName || "Company",
+          industry: "",
+          logo: "",
+          verified: true,
+        },
+      };
+
+      await setDoc(doc(db, "jobs", jobId), newJob);
+
+      setJobs((prev) => [newJob, ...prev]);
+      setShowCreateForm(false);
+      form.reset();
+    } catch (e) {
+      console.error(e);
+      setError("Failed to create job.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const getApplicationCount = (jobId: string) =>
-    applications.filter((app) => app.jobId === jobId).length;
+  if (loading) {
+    return (
+      <div className="w-full p-1">
+        <div className="text-gray-600">Loading…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full p-1">
-      {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-10">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Job Management</h1>
-          <p className="text-gray-600 mt-2">
-            Create and manage your job listings
-          </p>
+          <p className="text-gray-600 mt-2">Create jobs (immutable) for candidates</p>
         </div>
+
         <button
           onClick={() => setShowCreateForm(true)}
-          className="mt-4 md:mt-0 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all flex items-center gap-2"
+          disabled={!companyVerified}
+          className={`mt-4 md:mt-0 px-5 py-2.5 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+            companyVerified
+              ? "bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-200"
+              : "bg-gray-200 text-gray-500 cursor-not-allowed"
+          }`}
         >
           <Plus className="w-5 h-5" />
           Post New Job
         </button>
       </div>
 
-      {/* Create Job Dialog */}
+      {!companyVerified ? (
+        <div className="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
+          Job posting is disabled until your company is verified.
+        </div>
+      ) : null}
+
+      {error ? <div className="mb-6 text-sm text-red-600">{error}</div> : null}
+
       <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Job</DialogTitle>
             <DialogDescription>
-              Fill out the form below to create a new job listing.
+              Jobs are immutable once created. Editing is not supported.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-            {/* Title & Location */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -280,17 +258,16 @@ export const JobManagement: React.FC = () => {
                   </p>
                 )}
               </div>
+
               <div className="h-full">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Location
                 </label>
-                {/* <Input
-                  type="text"
-                  {...form.register("location")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                /> */}
 
-                <Select {...form.register("location")}>
+                <Select
+                  value={form.watch("location")}
+                  onValueChange={(v) => form.setValue("location", v as any)}
+                >
                   <SelectTrigger className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
@@ -309,7 +286,6 @@ export const JobManagement: React.FC = () => {
               </div>
             </div>
 
-            {/* Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Job Description
@@ -326,7 +302,6 @@ export const JobManagement: React.FC = () => {
               )}
             </div>
 
-            {/* Requirements */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Requirements (one per line)
@@ -335,11 +310,9 @@ export const JobManagement: React.FC = () => {
                 {...form.register("requirements")}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="5+ years experience&#10;Bachelor's degree&#10;Strong communication skills"
               />
             </div>
 
-            {/* Skills */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Skills (comma separated)
@@ -352,7 +325,6 @@ export const JobManagement: React.FC = () => {
               />
             </div>
 
-            {/* Type & Salary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -365,9 +337,11 @@ export const JobManagement: React.FC = () => {
                   <option value="full-time">Full-time</option>
                   <option value="part-time">Part-time</option>
                   <option value="contract">Contract</option>
-                  <option value="remote">Remote</option>
+                  <option value="internship">Internship</option>
+                  <option value="freelance">Freelance</option>
                 </select>
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Min Salary ($)
@@ -378,6 +352,7 @@ export const JobManagement: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Max Salary ($)
@@ -390,7 +365,6 @@ export const JobManagement: React.FC = () => {
               </div>
             </div>
 
-            {/* Actions */}
             <DialogFooter className="flex justify-end gap-3 pt-4">
               <button
                 type="button"
@@ -401,46 +375,47 @@ export const JobManagement: React.FC = () => {
               </button>
               <button
                 type="submit"
-                disabled={form.formState.isSubmitting}
+                disabled={submitting || !companyVerified}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                {form.formState.isSubmitting ? "Creating..." : "Create Job"}
+                {submitting ? "Creating..." : "Create Job"}
               </button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Jobs List */}
       <div className="space-y-6">
-        {companyJobs && companyJobs.length === 0 ? (
-          <div
-            className="text-center py-16 border border-dashed border-gray-300 rounded-lg"
-            key={0}
-          >
+        {jobs.length === 0 ? (
+          <div className="text-center py-16 border border-dashed border-gray-300 rounded-lg">
             <Briefcase className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
               No jobs posted yet
             </h3>
             <p className="text-gray-600 mb-6">
-              Start by creating your first job listing
+              {companyVerified
+                ? "Start by creating your first immutable job listing"
+                : "Verify your company to start posting jobs"}
             </p>
             <button
               onClick={() => setShowCreateForm(true)}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700"
+              disabled={!companyVerified}
+              className={`px-6 py-3 rounded-lg font-semibold ${
+                companyVerified
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-gray-200 text-gray-500 cursor-not-allowed"
+              }`}
             >
               Post Your First Job
             </button>
           </div>
         ) : (
-          companyJobs &&
-          companyJobs.map((job) => (
+          jobs.map((job) => (
             <div
               key={job.id}
               className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"
             >
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                {/* Left */}
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
                     <h3 className="text-xl font-semibold text-gray-900">
@@ -455,6 +430,11 @@ export const JobManagement: React.FC = () => {
                     >
                       {job.status}
                     </span>
+                    {job.immutable ? (
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        Immutable
+                      </span>
+                    ) : null}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600 mb-3">
@@ -464,16 +444,12 @@ export const JobManagement: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-1">
                       <DollarSign className="w-4 h-4" />$
-                      {job.salary.min.toLocaleString()} - $
-                      {job.salary.max.toLocaleString()}
+                      {Number(job.salary?.min || 0).toLocaleString()} - $
+                      {Number(job.salary?.max || 0).toLocaleString()}
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       {new Date(job.postedAt).toLocaleDateString()}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      {getApplicationCount(job.id)} applications
                     </div>
                   </div>
 
@@ -482,26 +458,15 @@ export const JobManagement: React.FC = () => {
                   </p>
 
                   <div className="flex flex-wrap gap-2">
-                    {job.skills &&
-                      job.skills.map((skill) => (
-                        <span
-                          key={skill}
-                          className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
-                        >
-                          {skill}
-                        </span>
-                      ))}
+                    {(job.skills || []).map((skill: string) => (
+                      <span
+                        key={skill}
+                        className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
+                      >
+                        {skill}
+                      </span>
+                    ))}
                   </div>
-                </div>
-
-                {/* Right: Actions */}
-                <div className="flex items-center gap-2 self-start">
-                  <button className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                    <Eye className="w-5 h-5" />
-                  </button>
-                  <button className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
-                    <Edit className="w-5 h-5" />
-                  </button>
                 </div>
               </div>
             </div>

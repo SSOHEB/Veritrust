@@ -1,7 +1,6 @@
 import type { Application, Job, User } from "@/types";
 import { createContext } from "react";
 import { type User as PrivyUser } from "@privy-io/react-auth";
-import type { PublicClient, WalletClient } from "viem";
 
 interface GlobalContextType {
   user: any | null;
@@ -17,8 +16,8 @@ interface GlobalContextType {
   ) => Promise<void>;
   logout: () => void;
   loading: boolean;
-  jobPublicClient: PublicClient | undefined;
-  jobWalletClient: WalletClient | undefined;
+  jobPublicClient: any;
+  jobWalletClient: any;
   contractAddress: string;
   job: Job[] | undefined;
   myApplication: Application[] | undefined;
