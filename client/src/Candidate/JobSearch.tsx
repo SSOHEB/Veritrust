@@ -1,10 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import type {
-  Candidate,
-  Application,
   Job,
-  Company,
-  ContractJob,
 } from "../types";
 import {
   Search,
@@ -17,63 +13,26 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { useGlobalContext } from "@/Context/useGlobalContext";
-import { contractAbi } from "@/lib/contractAbi";
-import type { Hex } from "viem";
-import { JobStatus, JobType, LocationType } from "@/lib/utils";
-
-// Mock candidate data
-const mockCandidate: Candidate = {
-  candidateId: "2",
-  email: "john.developer@example.com",
-  name: "Divyavani",
-  description: ["Passionate developer with 5+ years of experience"],
-  contacts: ["john.developer@example.com", "+1-555-0123", "San Francisco, CA"],
-  education: ["BS Computer Science"],
-  skills: ["React", "TypeScript", "Node.js", "JavaScript"],
-  resumePath: [""],
-  profileScore: "",
-};
-
-// Mock data
-const mockApplications: Application[] = [
-  {
-    id: "1",
-    jobId: "1",
-    candidateId: "2",
-    job: {} as Job,
-    candidate: {} as Candidate,
-    status: "pending",
-    appliedAt: "2024-01-15",
-  },
-];
-
-// mockJobs unused (jobs are loaded from the contract)
-
-// Match scoring disabled
-
-const applyToJob = (jobId: string, candidateId: string) => {
-  console.log(`Applied to job ${jobId} for candidate ${candidateId}`);
-  // In a real app, this would make an API call
-};
+import { getFirestore, collection, addDoc } from "firebase/firestore";
+import { app } from "@/lib/firebase";
+import { v4 as uuidv4 } from "uuid";
 
 export const JobSearch: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const { jobWalletClient, jobPublicClient, contractAddress } =
-    useGlobalContext();
 
-  const candidate = mockCandidate;
-  const candidateApplications = mockApplications.filter(
-    (app: Application) => app.candidateId === candidate.candidateId
-  );
-  const appliedJobIds = candidateApplications.map(
-    (app: Application) => app.jobId
-  );
+  const {
+    user,
+    allJobs,
+    myApplication
+  } = useGlobalContext();
 
-  const filteredJobs = jobs.filter((job: Job) => {
+  const appliedJobIds = (myApplication || []).map((app) => app.jobId);
+
+  // Filter jobs based on search terms
+  const filteredJobs = (allJobs || []).filter((job: Job) => {
     const matchesSearch =
       job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -90,99 +49,42 @@ export const JobSearch: React.FC = () => {
     return matchesSearch && matchesLocation && matchesType;
   });
 
-  const handleApply = (jobId: string) => {
-    applyToJob(jobId, candidate.candidateId ?? candidate.id ?? "");
-  };
+  const handleApply = async (job: Job) => {
+    if (!user) {
+      alert("Please sign in to apply.");
+      return;
+    }
+    if (user.type !== "candidate") {
+      alert("Only candidates can apply to jobs.");
+      return;
+    }
 
-  useEffect(() => {
-    if (!jobWalletClient) return;
-    if (!jobPublicClient) return;
-
-    (async function () {
-      try {
-        const jobs = await jobPublicClient.readContract({
-          address: contractAddress as Hex,
-          abi: contractAbi,
-          functionName: "getAllJobs",
-          args: [],
-        });
-
-        console.log("Fetched jobs from contract:", jobs);
-
-        const filteredContractJobs = jobs as ContractJob[];
-
-        // Get unique company IDs to fetch company information
-        const uniqueCompanyIds = [
-          ...new Set(filteredContractJobs.map((job) => job.companyId)),
-        ];
-
-        // Fetch company information for each unique company
-        const companyInfoMap = new Map();
-        for (const companyId of uniqueCompanyIds) {
-          try {
-            const companyInfo = await jobPublicClient.readContract({
-              address: contractAddress as Hex,
-              abi: contractAbi,
-              functionName: "getCompany",
-              args: [companyId],
-            });
-            companyInfoMap.set(companyId, companyInfo);
-          } catch (error) {
-            console.error(
-              `Error fetching company info for ${companyId}:`,
-              error
-            );
-            // Set fallback company info if contract call fails
-            companyInfoMap.set(companyId, {
-              name: "TechCorp Inc",
-              industry: "Technology",
-              size: "100-500",
-              description:
-                "Innovative technology company focused on cutting-edge solutions",
-            });
-          }
+    const db = getFirestore(app);
+    try {
+      const applicationId = uuidv4();
+      await addDoc(collection(db, "applications"), {
+        id: applicationId, // Store ID inside doc as well if needed, or rely on doc.id
+        jobId: job.id,
+        candidateId: user.id,
+        companyId: job.companyId,
+        status: "pending",
+        appliedAt: new Date().toISOString(),
+        // Store snapshot of job/candidate for easier display without joins
+        job: job,
+        candidate: {
+          candidateId: user.id,
+          name: user.name,
+          email: user.email,
+          // Add other candidate fields if available in user profile
+          // For now, minimal data is better than mock data
         }
-
-        const parsedJobs = filteredContractJobs.map((job) => {
-          const companyInfo = companyInfoMap.get(job.companyId) || {};
-
-          return {
-            id: job.jobId,
-            companyId: job.companyId,
-            company: {
-              id: job.companyId,
-              name: companyInfo.name || "TechCorp Inc",
-              companyName: companyInfo.name || "TechCorp Inc",
-              industry: companyInfo.industry || "Technology",
-              size: companyInfo.size || "100-500",
-              description:
-                companyInfo.description ||
-                "Innovative technology company focused on cutting-edge solutions",
-            } as Company,
-            title: job.title,
-            description: job.description,
-            requirements: job.requirements,
-            skills: job.skills,
-            location: LocationType[job.location], // map enum index → string
-            type: JobType[job.jobType], // map enum index → string
-            salary: {
-              min: Number(job.salaryRange?.[0] || 0),
-              max: Number(job.salaryRange?.[1] || 0),
-              currency: "USD",
-            },
-            postedAt: new Date().toISOString(),
-            status: JobStatus[job.status], // map enum index → string
-          };
-        });
-
-        console.log(parsedJobs, "loggggg");
-
-        setJobs(parsedJobs);
-      } catch (err) {
-        console.error("Error fetching jobs:", err);
-      }
-    })();
-  }, [jobWalletClient, jobPublicClient, contractAddress]);
+      });
+      console.log("Applied to job:", job.id);
+    } catch (error) {
+      console.error("Error applying to job:", error);
+      alert("Failed to apply. Please try again.");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -285,7 +187,7 @@ export const JobSearch: React.FC = () => {
 
                       <div className="flex items-center space-x-2 mb-3">
                         <h4 className="text-lg font-medium text-gray-700">
-                          {job.company?.companyName || "TechCorp Inc"}
+                          {job.company?.companyName || "Company"}
                         </h4>
                         <span className="text-gray-400">•</span>
                         <span className="text-gray-600">
@@ -324,14 +226,15 @@ export const JobSearch: React.FC = () => {
                       </p>
 
                       <div className="flex flex-wrap gap-2 mb-4">
-                        {job.skills.map((skill: string) => (
+                        {(job.skills || []).map((skill: string) => (
                           <span
                             key={skill}
                             className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              (candidate.skills ?? []).includes(skill)
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-100 text-gray-700"
-                            }`}
+                              //   (candidate.skills ?? []).includes(skill)
+                              //     ? "bg-green-100 text-green-800"
+                              //     : 
+                              "bg-gray-100 text-gray-700"
+                              }`}
                           >
                             {skill}
                           </span>
@@ -351,7 +254,7 @@ export const JobSearch: React.FC = () => {
                     </div>
                   ) : (
                     <button
-                      onClick={() => handleApply(job.id)}
+                      onClick={() => handleApply(job)}
                       className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all font-semibold"
                     >
                       Submit Profile

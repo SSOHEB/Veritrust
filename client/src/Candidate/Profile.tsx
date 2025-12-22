@@ -3,7 +3,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import type { Candidate } from "../types";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, getFirestore, type Timestamp } from "firebase/firestore";
+import { doc, getFirestore, type Timestamp, onSnapshot, setDoc } from "firebase/firestore";
 import { app, auth } from "@/lib/firebase";
 import {
   User,
@@ -19,21 +19,20 @@ import {
   Star,
 } from "lucide-react";
 
-// Mock candidate data
-const mockCandidate: Candidate = {
-  id: "2",
-  email: "john.developer@example.com",
-  name: "John Developer",
+// Initial empty candidate
+const initialCandidate: Candidate = {
+  id: "",
+  email: "",
+  name: "",
   type: "candidate",
-  createdAt: "2024-01-01",
-  title: "Senior Frontend Developer",
-  experience: 5,
-  skills: ["React", "TypeScript", "Node.js", "JavaScript", "CSS", "HTML"],
-  location: "San Francisco, CA",
-  bio: "Passionate full-stack developer with 5+ years of experience in React and modern web technologies. Love building user-friendly applications and learning new technologies.",
-  education: "BS Computer Science - Stanford University",
-  phone: "+1-555-0123",
-  // Profile score section disabled
+  createdAt: "",
+  title: "",
+  experience: 0,
+  skills: [],
+  location: "",
+  bio: "",
+  education: "",
+  phone: "",
 };
 
 type ProfileFormData = {
@@ -61,57 +60,51 @@ export const Profile: React.FC = () => {
     null
   );
 
-  const candidate = mockCandidate;
-  const candidateName = candidate.name ?? "";
-  const candidateSkills = candidate.skills ?? [];
-  const candidateEducation = Array.isArray(candidate.education)
-    ? candidate.education[0] ?? ""
-    : candidate.education ?? "";
+  const [candidate, setCandidate] = useState<Candidate>(initialCandidate);
 
+  // Sync candidate data from Firestore
   useEffect(() => {
-    const load = async (uid: string) => {
-      try {
-        const db = getFirestore(app);
-        const userRef = doc(db, "users", uid);
-        const snap = await getDoc(userRef);
-        const data = snap.data() as any;
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        setCandidate(initialCandidate);
+        return;
+      }
 
-        const saved = data?.aiProfileFeedback;
-        if (!saved) return;
+      const db = getFirestore(app);
+      const userRef = doc(db, "users", user.uid);
 
-        const strengths = Array.isArray(saved.strengths)
-          ? saved.strengths.filter((s: unknown) => typeof s === "string")
-          : [];
-        const suggestions = Array.isArray(saved.suggestions)
-          ? saved.suggestions.filter((s: unknown) => typeof s === "string")
-          : [];
-        const exampleRewrite =
-          typeof saved.exampleRewrite === "string" ? saved.exampleRewrite : "";
+      const unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          // Update candidate state
+          setCandidate({ ...initialCandidate, ...data } as Candidate);
 
-        setAiFeedback({ strengths, suggestions, exampleRewrite });
+          // Also handle AI feedback from the same document if present
+          if (data.aiProfileFeedback) {
+            const saved = data.aiProfileFeedback;
+            const strengths = Array.isArray(saved.strengths)
+              ? saved.strengths.filter((s: unknown) => typeof s === "string")
+              : [];
+            const suggestions = Array.isArray(saved.suggestions)
+              ? saved.suggestions.filter((s: unknown) => typeof s === "string")
+              : [];
+            const exampleRewrite =
+              typeof saved.exampleRewrite === "string" ? saved.exampleRewrite : "";
 
-        const ts = saved.updatedAt as Timestamp | undefined;
-        if (ts && typeof (ts as any).toDate === "function") {
-          setAiFeedbackUpdatedAt(ts.toDate().toLocaleString());
+            setAiFeedback({ strengths, suggestions, exampleRewrite });
+
+            const ts = saved.updatedAt as Timestamp | undefined;
+            if (ts && typeof (ts as any).toDate === "function") {
+              setAiFeedbackUpdatedAt(ts.toDate().toLocaleString());
+            }
+          }
         }
-      } catch {
-        // ignore load errors (read-only enhancement)
-      }
-    };
+      });
 
-    const existingUid = auth.currentUser?.uid;
-    if (existingUid) {
-      void load(existingUid);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user?.uid) {
-        void load(user.uid);
-      }
+      return () => unsubscribeSnapshot();
     });
 
-    return unsubscribe;
+    return () => unsubscribeAuth();
   }, []);
 
   const {
@@ -123,14 +116,14 @@ export const Profile: React.FC = () => {
     formState: { errors, isSubmitting },
   } = useForm<ProfileFormData>({
     defaultValues: {
-      name: candidateName,
+      name: "",
       title: candidate.title ?? "",
       bio: candidate.bio ?? "",
       location: candidate.location ?? "",
       experience: candidate.experience ?? 0,
-      education: candidateEducation,
+      education: "",
       phone: candidate.phone || "",
-      skills: candidateSkills.map((skill) => ({ value: skill })),
+      skills: [],
     },
   });
 
@@ -139,15 +132,57 @@ export const Profile: React.FC = () => {
     name: "skills",
   });
 
+  // Update form default values when candidate data changes
+  // We only reset if NOT editing to avoid overwriting user input, 
+  // OR we can rely on the fact that when we save, isEditing becomes false, 
+  // and then this effect will run to update the "view" mode, 
+  // and next time "edit" is clicked, reset() (from handleEditClick mostly) should handle it.
+  // Ideally, react-hook-form 'defaultValues' is only initial. 
+  // To update form with new data, we need reset().
+  useEffect(() => {
+    if (!isEditing && candidate.name) {
+      reset({
+        name: candidate.name ?? "",
+        title: candidate.title ?? "",
+        bio: candidate.bio ?? "",
+        location: candidate.location ?? "",
+        experience: candidate.experience ?? 0,
+        education: typeof candidate.education === 'string' ? candidate.education : (Array.isArray(candidate.education) ? candidate.education[0] : "") ?? "",
+        phone: candidate.phone || "",
+        skills: (candidate.skills ?? []).map((skill) => ({ value: skill })),
+      });
+    }
+  }, [candidate, isEditing, reset]);
+
   const onSubmit = async (data: ProfileFormData) => {
     try {
-      // Profile save only (no AI call here)
-      console.log("Profile data:", {
-        ...data,
+      const uid = auth.currentUser?.uid;
+      if (!uid) {
+        console.error("User not authenticated");
+        return;
+      }
+
+      const db = getFirestore(app);
+      const userRef = doc(db, "users", uid);
+
+      const profileData = {
+        name: data.name,
+        title: data.title,
+        bio: data.bio,
+        location: data.location,
+        experience: Number(data.experience),
+        education: data.education,
+        phone: data.phone,
         skills: (data.skills ?? [])
           .map((skill) => skill.value)
           .filter((skill) => skill.trim() !== ""),
-      });
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Merge with existing data
+      await setDoc(userRef, profileData, { merge: true });
+
+      console.log("Profile updated successfully");
       setIsEditing(false);
     } catch (error) {
       console.error("Error saving profile:", error);
@@ -250,7 +285,8 @@ export const Profile: React.FC = () => {
         <div className="flex items-center space-x-6">
           <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
             <span className="text-white font-bold text-2xl">
-              {candidateName
+
+              {(candidate.name ?? "")
                 .split(" ")
                 .filter(Boolean)
                 .map((n) => n.charAt(0))
@@ -283,7 +319,7 @@ export const Profile: React.FC = () => {
             ) : (
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
-                  {candidateName}
+                  {candidate.name ?? ""}
                 </h1>
                 <p className="text-lg text-gray-600 mt-1">{candidate.title ?? ""}</p>
               </div>
@@ -396,7 +432,7 @@ export const Profile: React.FC = () => {
                 ) : (
                   <div className="flex items-center space-x-2">
                     <GraduationCap className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-900">{candidateEducation}</span>
+                    <span className="text-gray-900">{typeof candidate.education === 'string' ? candidate.education : (Array.isArray(candidate.education) ? candidate.education[0] : "") ?? ""}</span>
                   </div>
                 )}
                 {errors.education && (
@@ -473,7 +509,7 @@ export const Profile: React.FC = () => {
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
-                {candidateSkills.map((skill) => (
+                {(candidate.skills ?? []).map((skill) => (
                   <span
                     key={skill}
                     className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full"
@@ -491,7 +527,7 @@ export const Profile: React.FC = () => {
                 Skill Assessment
               </h4>
               <div className="space-y-2">
-                {candidateSkills.slice(0, 3).map((skill) => (
+                {(candidate.skills ?? []).slice(0, 3).map((skill) => (
                   <div
                     key={skill}
                     className="flex items-center justify-between"
@@ -576,7 +612,7 @@ export const Profile: React.FC = () => {
               disabled={aiLoading}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all font-semibold disabled:opacity-50"
             >
-            {aiLoading ? "Generating..." : "Get AI Profile Feedback"}
+              {aiLoading ? "Generating..." : "Get AI Profile Feedback"}
             </button>
             <p className="text-xs text-gray-500 mt-2 text-right">
               Suggestions are advisory only. Final profile content is always controlled by the student.

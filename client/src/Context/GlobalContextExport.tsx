@@ -19,6 +19,7 @@ interface GlobalContextType {
   jobWalletClient: WalletClient | undefined;
   contractAddress: string;
   job: Job[] | undefined;
+  allJobs: Job[] | undefined;
   myApplication: Application[] | undefined;
   companyApplications: Application[] | undefined;
   uploadZKProof: (
@@ -36,15 +37,16 @@ interface GlobalContextType {
 
 export const GlobalContext = createContext<GlobalContextType>({
   user: null,
-  login: async () => {},
-  register: async () => {},
-  logout: () => {},
+  login: async () => { },
+  register: async () => { },
+  logout: () => { },
   loading: false,
   jobPublicClient: undefined,
   jobWalletClient: undefined,
   contractAddress: "",
   job: undefined,
+  allJobs: undefined,
   myApplication: undefined,
   companyApplications: undefined,
-  uploadZKProof: async () => {},
+  uploadZKProof: async () => { },
 });

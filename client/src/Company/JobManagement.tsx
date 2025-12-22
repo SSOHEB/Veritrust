@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Company } from "../types";
 import { v4 as uuidv4 } from "uuid";
 import {
   Dialog,
@@ -31,46 +30,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { useGlobalContext } from "@/Context/useGlobalContext";
-import { contractAbi } from "@/lib/contractAbi";
-import type { Hex } from "viem";
-import { flowTestnet } from "viem/chains";
-
-// Mock data
-const mockCompany: Company = {
-  id: "1",
-  email: "company@techinnovators.com",
-  name: "Tech Innovators Inc",
-  type: "company",
-  createdAt: "2015-01-01",
-  companyName: "Tech Innovators Inc",
-  industry: "Technology",
-  size: "100-500",
-  description: "Leading software development company",
-  website: "https://www.techinnovators.com",
-  logo: "",
-};
-
-// mockJobs unused (jobs are loaded from the contract)
-
-const mockApplications = [
-  { id: "1", jobId: "1" },
-  { id: "2", jobId: "1" },
-  { id: "3", jobId: "1" },
-];
-
-const jobTypeMapping: Record<string, bigint> = {
-  "full-time": BigInt(0),
-  "part-time": BigInt(1),
-  contract: BigInt(2),
-  internship: BigInt(3),
-  freelance: BigInt(4),
-};
-
-const locationTypeMapping: Record<string, bigint> = {
-  Remote: BigInt(0),
-  Hybrid: BigInt(1),
-  Onsite: BigInt(2),
-};
+import { app } from "@/lib/firebase";
+import { getFirestore, doc, setDoc } from "firebase/firestore";
 
 // Form validation schema
 const jobFormSchema = z.object({
@@ -100,11 +61,11 @@ type JobFormData = z.infer<typeof jobFormSchema>;
 export const JobManagement: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const {
-    jobWalletClient,
-    contractAddress,
-    jobPublicClient,
     job: companyJobs,
+    user,
+    companyApplications
   } = useGlobalContext();
+
   const form = useForm<JobFormData>({
     resolver: zodResolver(jobFormSchema),
     defaultValues: {
@@ -120,70 +81,51 @@ export const JobManagement: React.FC = () => {
     },
   });
 
-  const company = mockCompany;
-  // const companyJobs = mockJobs;
-  const applications = mockApplications;
-
-  const onSubmit = (data: JobFormData) => {
-    if (!jobWalletClient) return;
-    if (!jobPublicClient) return;
+  const onSubmit = async (data: JobFormData) => {
+    if (!user) {
+      console.error("User not authenticated");
+      return;
+    }
 
     const jobId = uuidv4();
+    const db = getFirestore(app);
 
-    console.log("Submitting job:", jobId, data);
+    const jobData = {
+      id: jobId,
+      companyId: user.id,
+      title: data.title,
+      description: data.description,
+      requirements: data.requirements ? data.requirements.split("\n").filter(r => r.trim()) : [],
+      skills: data.skills ? data.skills.split(",").map(s => s.trim()).filter(s => s) : [],
+      location: data.location,
+      type: data.type,
+      salary: {
+        min: Number(data.salaryMin) || 0,
+        max: Number(data.salaryMax) || 0,
+        currency: "USD",
+      },
+      postedAt: new Date().toISOString(),
+      status: data.status,
+      // Store minimal company info flat on the job for easier display without joins
+      company: {
+        id: user.id,
+        companyName: user.name || "Company",
+        // Add other fields if available in user profile
+      }
+    };
 
-    (async function () {
-      const [account] = await jobWalletClient.getAddresses();
-      const tx = await jobWalletClient.writeContract({
-        address: contractAddress as Hex,
-        abi: contractAbi,
-        functionName: "postJob",
-        args: [
-          jobId,
-          company.id,
-          data.title,
-          data.description,
-          [data.requirements],
-          [data.skills],
-          locationTypeMapping[data.location], // Use the mapping here
-          [data.salaryMin, data.salaryMax],
-          jobTypeMapping[data.type],
-        ],
-        account,
-        chain: flowTestnet,
-      });
-
-      await jobPublicClient.waitForTransactionReceipt({
-        hash: tx,
-      });
-
-
-      //      {
-      //   id: "2",
-      //   companyId: "1",
-      //   company: mockCompany,
-      //   title: "Backend Engineer",
-      //   description:
-      //     "Join our engineering team to build scalable backend services.",
-      //   requirements: [
-      //     "3+ years backend experience",
-      //     "Python or Node.js",
-      //     "SQL/NoSQL databases",
-      //   ],
-      //   skills: ["Python", "Node.js", "PostgreSQL", "APIs"],
-      //   location: "Remote",
-      //   type: "full-time",
-      //   salary: { min: 150000, max: 220000, currency: "USD" },
-      //   postedAt: "2024-01-10",
-      //   status: "active",
-      // },
-
-      console.log("Job posted on-chain with tx:", tx);
-    })();
+    try {
+      await setDoc(doc(db, "jobs", jobId), jobData);
+      console.log("Job posted to Firestore:", jobId);
+      setShowCreateForm(false);
+      form.reset();
+    } catch (error) {
+      console.error("Error posting job:", error);
+    }
   };
 
   const getApplicationCount = (jobId: string) =>
-    applications.filter((app) => app.jobId === jobId).length;
+    (companyApplications || []).filter((app) => app.jobId === jobId).length;
 
   return (
     <div className="w-full p-1">
@@ -234,13 +176,10 @@ export const JobManagement: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Location
                 </label>
-                {/* <Input
-                  type="text"
-                  {...form.register("location")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                /> */}
-
-                <Select {...form.register("location")}>
+                <Select
+                  onValueChange={(val) => form.setValue("location", val as any)}
+                  defaultValue={form.getValues("location")}
+                >
                   <SelectTrigger className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
@@ -250,6 +189,8 @@ export const JobManagement: React.FC = () => {
                     <SelectItem value="Onsite">Onsite</SelectItem>
                   </SelectContent>
                 </Select>
+                {/* Keep hidden input if needed for registration but setValue above handles it mostly, 
+                     but standard react-hook-form integration with UI lib components often needs Controller orsetValue manually */}
 
                 {form.formState.errors.location && (
                   <p className="text-red-500 text-xs mt-1">
@@ -397,11 +338,10 @@ export const JobManagement: React.FC = () => {
                       {job.title}
                     </h3>
                     <span
-                      className={`px-3 py-1 text-xs font-medium rounded-full ${
-                        job.status === "active"
+                      className={`px-3 py-1 text-xs font-medium rounded-full ${job.status === "active"
                           ? "bg-green-100 text-green-800"
                           : "bg-gray-100 text-gray-800"
-                      }`}
+                        }`}
                     >
                       {job.status}
                     </span>

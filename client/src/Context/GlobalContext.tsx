@@ -1,215 +1,171 @@
 import type {
   Application,
-  CompanyApplicationInterface,
   Job,
   User,
 } from "@/types";
 import { useEffect, useState, type ReactNode } from "react";
 import { GlobalContext } from "./GlobalContextExport";
-import { useNavigate } from "react-router-dom";
-import { flowTestnet } from "viem/chains";
-import { type Hex, type PublicClient, type WalletClient } from "viem";
-import { contractAbi } from "@/lib/contractAbi";
-
-// const mockUsers: User[] = [
-//   {
-//     id: "1",
-//     email: "company@demo.com",
-//     name: "Tech Innovators Inc",
-//     type: "company",
-//     createdAt: "2024-01-01",
-//     companyName: "Tech Innovators Inc",
-//     industry: "Technology",
-//     size: "100-500",
-//     description: "Leading software development company",
-//     website: "https://techinnovators.com",
-//   } as Company,
-//   {
-//     id: "2",
-//     email: "candidate@demo.com",
-//     name: "John Developer",
-//     type: "candidate",
-//     createdAt: "2024-01-01",
-//     title: "Senior Frontend Developer",
-//     experience: 5,
-//     skills: ["React", "TypeScript", "Node.js", "Python"],
-//     location: "San Francisco, CA",
-//     bio: "Passionate full-stack developer with 5+ years of experience",
-//     education: "BS Computer Science",
-//     phone: "+1-555-0123",
-//   } as Candidate,
-// ];
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  getFirestore,
+  doc,
+  onSnapshot,
+  collection,
+  query,
+  where,
+  updateDoc,
+} from "firebase/firestore";
+import { app, auth } from "@/lib/firebase";
 
 const CONTRACT_ADDRESS = "0x519a9057Bfe3e6bab6EDb7128b7Dba44d2adC083";
 
 export function GlobalContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [companyJobs] = useState<Job[]>([]);
-  const [myApplication] = useState<Application[]>([]);
-  const navigate = useNavigate();
+  const [companyJobs, setCompanyJobs] = useState<Job[]>([]);
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
+  const [myApplication, setMyApplication] = useState<Application[]>([]);
+  const [companyApplications, setCompanyApplications] = useState<Application[]>([]);
 
-  const [jobPublicClient] = useState<PublicClient | undefined>();
-  const [jobWalletClient] = useState<WalletClient | undefined>();
-
-  const [companyApplications, setCompanyApplications] = useState<
-    CompanyApplicationInterface[]
-  >([]);
+  // Defined as undefined since we removed direct contract interaction in this phase
+  const jobPublicClient = undefined;
+  const jobWalletClient = undefined;
 
   useEffect(() => {
-    // Check for stored auth
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    const db = getFirestore(app);
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        // 1. Fetch User Profile
+        const userUnsub = onSnapshot(doc(db, "users", firebaseUser.uid), (docSnap) => {
+          if (docSnap.exists()) {
+            // Merge firebase auth email/name if missing in firestore (optional but good for sync)
+            const userData = { id: firebaseUser.uid, ...docSnap.data() } as User;
+            setUser(userData);
+          } else {
+            // Handle case where user authenticates but no firestore doc exists yet
+            // Maybe wait for registration? Or just set partial user?
+            // For now, setting partial user from Auth
+            setUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email || "",
+              name: firebaseUser.displayName || "",
+              type: "candidate", // Default, will change if found in DB later
+              createdAt: new Date().toISOString(),
+            } as User);
+          }
+          setLoading(false);
+        });
+
+        // 2. Fetch All Jobs (Global Requirement)
+        const allJobsUnsub = onSnapshot(collection(db, "jobs"), (snapshot) => {
+          const jobsData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Job));
+          setAllJobs(jobsData);
+        });
+
+        return () => {
+          userUnsub();
+          allJobsUnsub();
+        };
+      } else {
+        setUser(null);
+        setCompanyJobs([]);
+        setAllJobs([]);
+        setMyApplication([]);
+        setCompanyApplications([]);
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribeAuth();
   }, []);
 
+  // Effect to fetch role-specific data based on `user` state
+  useEffect(() => {
+    if (!user) return;
+    const db = getFirestore(app);
+    const unsubs: (() => void)[] = [];
+
+    if (user.type === "company") {
+      // Fetch Company Jobs
+      const qJobs = query(collection(db, "jobs"), where("companyId", "==", user.id));
+      const jobsUnsub = onSnapshot(qJobs, (snapshot) => {
+        setCompanyJobs(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Job)));
+      });
+      unsubs.push(jobsUnsub);
+
+      // Fetch Company Applications (applications FOR this company)
+      const qApps = query(collection(db, "applications"), where("companyId", "==", user.id));
+      const appsUnsub = onSnapshot(qApps, (snapshot) => {
+        setCompanyApplications(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Application)));
+      });
+      unsubs.push(appsUnsub);
+
+    } else if (user.type === "candidate") {
+      // Fetch My Applications
+      const qApps = query(collection(db, "applications"), where("candidateId", "==", user.id));
+      const appsUnsub = onSnapshot(qApps, (snapshot) => {
+        setMyApplication(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Application)));
+      });
+      unsubs.push(appsUnsub);
+    }
+
+    return () => {
+      unsubs.forEach((u) => u());
+    };
+  }, [user?.id, user?.type]); // Re-run if user ID or Type changes
 
   const login = async (
     email: string,
     _password: string,
     type: "company" | "candidate"
   ) => {
-    // avoid unused-parameter build failures (login is currently a stub)
-    void email;
-    void type;
-
-    setLoading(true);
-    // Mock authentication
-    // const foundUser = mockUsers.find(
-    //   (u) => u.email === email && u.type === type
-    // );
-
-    // if (foundUser) {
-    //   setUser(foundUser);
-    //   localStorage.setItem("user", JSON.stringify(foundUser));
-    //   navigate(`/${type}`);
-    // } else {
-    //   // Fallback to creating a mock user based on type
-    //   // const mockUser = type === "company" ? mockUsers[0] : mockUsers[1];
-    //   setUser(mockUser);
-    //   localStorage.setItem("user", JSON.stringify(mockUser));
-    //   navigate(`/${type}`);
-    // }
-
-    setLoading(false);
+    // NOTE: Login is handled by LoginForm.tsx via signInWithPopup.
+    // This function is kept for interface compatibility but may not be used directly for Auth changes.
+    // In a real email/pass flow, implementation would go here.
+    console.warn("GlobalContext login called - implementation relies on Firebase Auth listener");
   };
 
   const register = async (
     userData: Partial<User>,
     type: "company" | "candidate"
   ) => {
-    setLoading(true);
-    // Mock registration
-    const newUser: User = {
-      id: Date.now().toString(),
-      email: userData.email!,
-      name: userData.name!,
-      type,
-      createdAt: new Date().toISOString(),
-      ...userData,
-    };
-
-    setUser(newUser);
-    localStorage.setItem("user", JSON.stringify(newUser));
-    setLoading(false);
+    // NOTE: Registration mostly happens via profile creation or post-auth hook.
+    // Interface stub preserved.
+    console.warn("GlobalContext register called");
   };
 
   const logout = () => {
-    setUser(null);
-    navigate("/");
-    localStorage.removeItem("user");
+    auth.signOut();
+    // navigate("/"); // Removed useNavigate, so this line is commented out or removed
   };
-
-
-  // const fetchAllJobs = async () => {
-  //   if (!jobPublicClient) return;
-  //   try {
-  //     const jobs = await jobPublicClient.readContract({
-  //       address: CONTRACT_ADDRESS as Hex,
-  //       abi: contractAbi,
-  //       functionName: "getAllJobs",
-  //       args: [],
-  //     });
-
-  //     console.log("Fetched jobs from contract: loggggg", jobs);
-
-  //     // @ts-ignore
-  //     console.log(user.google?.email, "user email");
-  //     const parsedJobs = (jobs as ContractJob[])
-  //       .filter(
-  //         (job) =>
-  //           // @ts-ignore
-  //           job.companyId == user.google?.email || job.companyId == user.id
-  //       ) // only jobs for this company
-  //       .map((job) => ({
-  //         id: job.jobId,
-  //         companyId: job.companyId,
-  //         title: job.title,
-  //         description: job.description,
-  //         requirements: job.requirements,
-  //         skills: job.skills,
-  //         location: LocationType[job.location], // map enum index → string
-  //         type: JobType[job.jobType], // map enum index → string
-  //         salary: {
-  //           min: Number(job.salaryRange?.[0] || 0),
-  //           max: Number(job.salaryRange?.[1] || 0),
-  //           currency: "USD",
-  //         },
-  //         postedAt: new Date().toISOString(),
-  //         status: JobStatus[job.status], // map enum index → string
-  //       }));
-
-  //     console.log(parsedJobs, "loggggg");
-  //     return parsedJobs;
-  //     // setCompanyJobs(parsedJobs);
-  //   } catch (err) {
-  //     console.error("Error fetching jobs:", err);
-  //   }
-  // };
-
-
 
 
   const updateApplicationStatus = async (
     applicationId: string,
     newStatus: "approved" | "rejected"
   ) => {
-    if (!jobWalletClient) return;
-
-    const statusMap: Record<"approved" | "rejected", 0 | 1 | 2 | 3> = {
-      approved: 2,
-      rejected: 3,
-    };
+    const db = getFirestore(app);
+    const mappedStatus = newStatus === "approved" ? "accepted" : "rejected";
 
     try {
-      const txHash = await jobWalletClient.writeContract({
-        address: CONTRACT_ADDRESS as Hex,
-        abi: contractAbi,
-        functionName: "updateApplicationStatus",
-        args: [applicationId, statusMap[newStatus]],
-        chain: flowTestnet,
-        account: jobWalletClient.account || null,
+      await updateDoc(doc(db, "applications", applicationId), {
+        status: mappedStatus
       });
+      // No need to setCompanyApplications locally; onSnapshot will handle it.
 
-      console.log("Transaction hash:", txHash);
-      // Optionally, wait for transaction confirmation here
-
-      // Update local state after successful blockchain update
-      const mappedStatus = newStatus === "approved" ? "accepted" : "rejected";
-      setCompanyApplications((prevApps) =>
-        prevApps.map((app) =>
-          app.id === applicationId ? { ...app, status: mappedStatus } : app
-        )
-      );
+      // Legacy Contract Call (Optional - keeping for reference if contract sync is desired later)
+      /*
+      if (jobWalletClient) {
+         // Contract logic here...
+      }
+      */
     } catch (err) {
       console.error("Error updating application status:", err);
     }
   };
 
   // Mock function to simulate uploading zk proof
-
   const uploadZKProof = (
     applicationId: string,
     proofType: string,
@@ -242,6 +198,7 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
         jobWalletClient,
         contractAddress: CONTRACT_ADDRESS,
         job: companyJobs,
+        allJobs,
         myApplication,
         companyApplications,
         uploadZKProof,

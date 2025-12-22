@@ -9,114 +9,7 @@ import {
 } from "lucide-react";
 import { useGlobalContext } from "@/Context/useGlobalContext";
 
-// Mock data
-// const mockApplications: Application[] = [
-//   {
-//     id: "1",
-//     jobId: "1",
-//     candidateId: "2",
-//     job: {
-//       id: "1",
-//       companyId: "1",
-//       company: {
-//         id: "1",
-//         name: "Tech Innovators Inc",
-//         companyName: "Tech Innovators Inc",
-//         industry: "Technology",
-//         size: "100-500",
-//         description: "Leading software development company",
-//       } as Company,
-//       title: "Senior Frontend Developer",
-//       description: "Looking for a skilled Frontend Developer",
-//       requirements: ["5+ years React experience", "TypeScript proficiency"],
-//       skills: ["React", "TypeScript", "JavaScript"],
-//       location: "San Francisco, CA",
-//       type: "full-time",
-//       salary: { min: 120000, max: 180000, currency: "USD" },
-//       postedAt: "2024-01-10",
-//       status: "active",
-//     } as Job,
-//     candidate: {
-//       id: "2",
-//       email: "candidate@demo.com",
-//       name: "John Developer",
-//       type: "candidate",
-//       createdAt: "2024-01-01",
-//       title: "Senior Frontend Developer",
-//       experience: 5,
-//       skills: ["React", "TypeScript", "Node.js"],
-//       location: "San Francisco, CA",
-//       bio: "Passionate developer",
-//       education: "BS Computer Science",
-//     } as Candidate,
-//     status: "pending",
-//     appliedAt: "2024-01-15",
-//     compatibilityScore: 85,
-//   },
-//   {
-//     id: "2",
-//     jobId: "2",
-//     candidateId: "2",
-//     job: {
-//       id: "2",
-//       companyId: "1",
-//       company: {
-//         id: "1",
-//         name: "Startup",
-//         companyName: "Startup",
-//         industry: "Technology",
-//         size: "50-100",
-//         description: "High-growth software company",
-//       } as Company,
-//       title: "Backend Engineer",
-//       description: "Backend engineering position",
-//       requirements: ["Python", "SQL", "3+ years experience"],
-//       skills: ["Python", "SQL", "APIs"],
-//       location: "Remote",
-//       type: "full-time",
-//       salary: { min: 130000, max: 200000, currency: "USD" },
-//       postedAt: "2024-01-12",
-//       status: "active",
-//     } as Job,
-//     candidate: {
-//       id: "2",
-//       email: "candidate@demo.com",
-//       name: "John Developer",
-//       type: "candidate",
-//       createdAt: "2024-01-01",
-//       title: "Senior Frontend Developer",
-//       experience: 5,
-//       skills: ["React", "TypeScript", "Node.js"],
-//       location: "San Francisco, CA",
-//       bio: "Passionate developer",
-//       education: "BS Computer Science",
-//     } as Candidate,
-//     status: "interview_scheduled",
-//     appliedAt: "2024-01-14",
-//     compatibilityScore: 78,
-//   },
-// ];
-
 export const ApplicationStatus: React.FC = () => {
-  // Mock candidate data
-  // const candidate: Candidate = {
-  //   id: "2",
-  //   email: "candidate@demo.com",
-  //   name: "John Developer",
-  //   type: "candidate",
-  //   createdAt: "2024-01-01",
-  //   title: "Senior Frontend Developer",
-  //   experience: 5,
-  //   skills: ["React", "TypeScript", "Node.js"],
-  //   location: "San Francisco, CA",
-  //   bio: "Passionate developer",
-  //   education: "BS Computer Science",
-  // };
-
-  // const candidateApplications = mockApplications.filter(
-  //   (app: Application) => app.candidateId === candidate.id
-  // );
-
   // Keep in sync with Application["status"] in types/index.ts
   type StatusKey = "pending" | "reviewed" | "accepted" | "rejected";
 
@@ -139,20 +32,20 @@ export const ApplicationStatus: React.FC = () => {
       icon: CheckCircle,
       color: "bg-blue-100 text-blue-800 border-blue-200",
       label: "Under Review",
-      description: "Your profile submission is under review",
+      description: "Your profile submission is being reviewed by the company",
     },
     accepted: {
       icon: FileText,
       color: "bg-green-100 text-green-800 border-green-200",
       label: "Verified",
-      description: "Your profile submission has been verified",
+      description: "Your application has been accepted!",
     },
     rejected: {
       icon: Clock,
       color: "bg-red-100 text-red-800 border-red-200",
       label: "Needs Attention",
       description:
-        "Your profile submission needs attention. Check details and submit updates if needed",
+        "Your application was not selected for this role.",
     },
   };
 
@@ -169,6 +62,9 @@ export const ApplicationStatus: React.FC = () => {
 
   const { myApplication } = useGlobalContext();
 
+  // Helper to ensure job exists (in case of stale application pointers)
+  const validApplications = (myApplication || []).filter(app => app.job);
+
   return (
     <div className="space-y-6">
       <div>
@@ -178,7 +74,7 @@ export const ApplicationStatus: React.FC = () => {
         </p>
       </div>
 
-      {myApplication && myApplication.length === 0 ? (
+      {validApplications.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
           <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -188,44 +84,50 @@ export const ApplicationStatus: React.FC = () => {
             Browse jobs and submit your profile to positions that match your
             skills
           </p>
-          <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+          <button
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+          // Note: Navigation would be handled by parent or Link component usually. 
+          // Since this is a view component, we assume user knows to click "Find Jobs".
+          // Alternatively, could use navigate() if we import it.
+          >
             Browse Jobs
           </button>
         </div>
       ) : (
         <div className="space-y-6">
-          {myApplication &&
-            myApplication.map((application: Application) => {
-              const statusInfo = statusConfig[application.status as StatusKey];
-              const StatusIcon = statusInfo.icon;
-              const statusSteps = getStatusSteps(application.status as StatusKey);
+          {validApplications.map((application: Application) => {
+            // Default to pending if status is unknown/invalid
+            const statusKey = (statusConfig[application.status as StatusKey] ? application.status : "pending") as StatusKey;
+            const statusInfo = statusConfig[statusKey];
+            const StatusIcon = statusInfo.icon;
+            const statusSteps = getStatusSteps(statusKey);
 
-              return (
-                <div
-                  key={application.id}
-                  className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
-                >
-                  {/* Header */}
-                  <div className="p-6 border-b border-gray-100">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-4">
-                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <Building2 className="w-6 h-6 text-gray-600" />
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                            {application.job.title}
-                          </h3>
-                          <p className="text-gray-600 mb-2">
-                            {/* @ts-ignore */}
-                            {application.job.companyName}
-                          </p>
+            return (
+              <div
+                key={application.id}
+                className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+              >
+                {/* Header */}
+                <div className="p-6 border-b border-gray-100">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-4">
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <Building2 className="w-6 h-6 text-gray-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-1">
+                          {application.job?.title || "Unknown Position"}
+                        </h3>
+                        <p className="text-gray-600 mb-2">
+                          {application.job?.company?.companyName || "Unknown Company"}
+                        </p>
 
-                          <div className="flex items-center space-x-4 text-sm text-gray-500">
-                            <div className="flex items-center space-x-1">
-                              <MapPin className="w-4 h-4" />
-                              <span>{application.job.location}</span>
-                            </div>
+                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                          <div className="flex items-center space-x-1">
+                            <MapPin className="w-4 h-4" />
+                            <span>{application.job?.location || "Remote"}</span>
+                          </div>
+                          {application.job?.salary && (
                             <div className="flex items-center space-x-1">
                               <DollarSign className="w-4 h-4" />
                               <span>
@@ -233,98 +135,95 @@ export const ApplicationStatus: React.FC = () => {
                                 ${application.job.salary.max.toLocaleString()}
                               </span>
                             </div>
-                            <span>
-                              Submitted{" "}
-                              {new Date(
-                                application.appliedAt
-                              ).toLocaleDateString()}
-                            </span>
-                          </div>
+                          )}
+                          <span>
+                            Submitted{" "}
+                            {new Date(
+                              application.appliedAt
+                            ).toLocaleDateString()}
+                          </span>
                         </div>
                       </div>
-
-                      <div className="flex items-center space-x-3">
-                        {/* Extra badges disabled */}
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${statusInfo.color}`}
-                        >
-                          <StatusIcon className="w-4 h-4 mr-1" />
-                          {statusInfo.label}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Progress Timeline */}
-                  <div className="p-6 bg-gray-50">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-lg font-semibold text-gray-900">
-                        Submission Progress
-                      </h4>
-                      <button className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1">
-                        <span>View Details</span>
-                      </button>
                     </div>
 
-                    <div className="relative">
-                      <div className="flex justify-between">
-                        {(application.status === "rejected"
-                          ? (["pending", "rejected"] as StatusKey[])
-                          : (["pending", "reviewed", "accepted"] as StatusKey[])
-                        ).map((step, index, stepsArr) => {
-                          const isCompleted = statusSteps.includes(step);
-                          const isCurrent = (application.status as StatusKey) === step;
-                          const stepConfig = statusConfig[step as StatusKey];
-                          const StepIcon = stepConfig.icon;
-
-                          return (
-                            <div
-                              key={step}
-                              className="flex flex-col items-center relative"
-                            >
-                              <div
-                                className={`w-10 h-10 rounded-full border-2 flex items-center justify-center ${
-                                  isCompleted
-                                    ? "bg-blue-600 border-blue-600 text-white"
-                                    : isCurrent
-                                    ? "bg-blue-100 border-blue-600 text-blue-600"
-                                    : "bg-gray-100 border-gray-300 text-gray-400"
-                                }`}
-                              >
-                                <StepIcon className="w-5 h-5" />
-                              </div>
-                              <span
-                                className={`text-xs mt-2 text-center max-w-20 ${
-                                  isCompleted || isCurrent
-                                    ? "text-gray-900 font-medium"
-                                    : "text-gray-500"
-                                }`}
-                              >
-                                {stepConfig.label.replace(" ", "\n")}
-                              </span>
-
-                              {index < stepsArr.length - 1 && (
-                                <div
-                                  className={`absolute top-5 left-12 w-36 h-0.5 ${
-                                    isCompleted ? "bg-blue-600" : "bg-gray-300"
-                                  }`}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="mt-6 p-4 bg-white rounded-lg border border-gray-200">
-                      <p className="text-sm text-gray-700">
-                        {statusInfo.description}
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${statusInfo.color}`}
+                      >
+                        <StatusIcon className="w-4 h-4 mr-1" />
+                        {statusInfo.label}
+                      </span>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+
+                {/* Progress Timeline */}
+                <div className="p-6 bg-gray-50">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-gray-900">
+                      Submission Progress
+                    </h4>
+                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1">
+                      <span>View Details</span>
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <div className="flex justify-between">
+                      {(statusKey === "rejected"
+                        ? (["pending", "rejected"] as StatusKey[])
+                        : (["pending", "reviewed", "accepted"] as StatusKey[])
+                      ).map((step, index, stepsArr) => {
+                        const isCompleted = statusSteps.includes(step);
+                        const isCurrent = statusKey === step;
+                        const stepConfig = statusConfig[step as StatusKey];
+                        const StepIcon = stepConfig.icon;
+
+                        return (
+                          <div
+                            key={step}
+                            className="flex flex-col items-center relative"
+                          >
+                            <div
+                              className={`w-10 h-10 rounded-full border-2 flex items-center justify-center ${isCompleted
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : isCurrent
+                                    ? "bg-blue-100 border-blue-600 text-blue-600"
+                                    : "bg-gray-100 border-gray-300 text-gray-400"
+                                }`}
+                            >
+                              <StepIcon className="w-5 h-5" />
+                            </div>
+                            <span
+                              className={`text-xs mt-2 text-center max-w-20 ${isCompleted || isCurrent
+                                  ? "text-gray-900 font-medium"
+                                  : "text-gray-500"
+                                }`}
+                            >
+                              {stepConfig.label.replace(" ", "\n")}
+                            </span>
+
+                            {index < stepsArr.length - 1 && (
+                              <div
+                                className={`absolute top-5 left-12 w-36 h-0.5 ${isCompleted ? "bg-blue-600" : "bg-gray-300"
+                                  }`}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 p-4 bg-white rounded-lg border border-gray-200">
+                    <p className="text-sm text-gray-700">
+                      {statusInfo.description}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
