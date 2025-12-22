@@ -1,4 +1,4 @@
-import type { Application, Company, Job } from "@/types";
+import type { Application, Company } from "@/types";
 import {
   Briefcase,
   Users,
@@ -6,151 +6,112 @@ import {
   Clock,
   Eye,
   UserCheck,
+  ShieldCheck,
+  AlertTriangle
 } from "lucide-react";
-
-// Mock data
-const jobs: Job[] = [
-  {
-    id: "1",
-    companyId: "1",
-    company: {
-      id: "1",
-      email: "company@demo.com",
-      name: "Tech Innovators Inc",
-      type: "company",
-      createdAt: "2024-01-01",
-      companyName: "Tech Innovators Inc",
-      industry: "Technology",
-      size: "100-500",
-      description: "Leading software development company",
-    } as Company,
-    title: "Senior Frontend Developer",
-    description:
-      "We are looking for a skilled Frontend Developer to join our team and help build next-generation web applications.",
-    requirements: [
-      "5+ years React experience",
-      "TypeScript proficiency",
-      "UI/UX design skills",
-    ],
-    skills: ["React", "TypeScript", "JavaScript", "CSS", "HTML"],
-    location: "San Francisco, CA",
-    type: "full-time",
-    salary: { min: 120000, max: 180000, currency: "USD" },
-    postedAt: "2024-01-15",
-    status: "active",
-  },
-  {
-    id: "2",
-    companyId: "1",
-    company: {
-      id: "1",
-      email: "company@demo.com",
-      name: "Tech Innovators Inc",
-      type: "company",
-      createdAt: "2024-01-01",
-      companyName: "Tech Innovators Inc",
-      industry: "Technology",
-      size: "100-500",
-      description: "Leading software development company",
-    } as Company,
-    title: "Backend Engineer",
-    description:
-      "Join our engineering team to build scalable backend services.",
-    requirements: [
-      "3+ years backend experience",
-      "Python or Node.js",
-      "SQL/NoSQL databases",
-    ],
-    skills: ["Python", "Node.js", "PostgreSQL", "APIs"],
-    location: "Remote",
-    type: "full-time",
-    salary: { min: 150000, max: 220000, currency: "USD" },
-    postedAt: "2024-01-10",
-    status: "active",
-  },
-];
-
-const company: Company = {
-  id: "1",
-  email: "company@demo.com",
-  name: "Tech Innovators Inc",
-  type: "company",
-  createdAt: "2024-01-01",
-  companyName: "Tech Innovators Inc",
-  industry: "Technology",
-  size: "100-500",
-  description: "Leading software development company",
-};
-
-const applications: Application[] = [];
+import { useGlobalContext } from "@/Context/useGlobalContext";
+import { useState } from "react";
 
 export const CompanyOverview: React.FC = () => {
-  const companyJobs = jobs.filter((job) => job.companyId === company.id);
-  const totalApplications = applications.filter((app) =>
-    companyJobs.some((job) => job.id === app.jobId)
-  );
+  const { user, companyJobs, companyApplications, verifyCompany } = useGlobalContext();
+  const [verifying, setVerifying] = useState(false);
+
+  const companyUser = user as Company; // Safe cast if we assume this component is protected by role guard
+  // In a real app, we'd enable the guard or check type here.
+
+  const safeJobs = companyJobs || [];
+  const safeApps = companyApplications || [];
+
+  const handleVerify = async () => {
+    setVerifying(true);
+    await verifyCompany();
+    setVerifying(false); // actually verifyCompany updates Firestore, which updates 'user' via listener
+  };
 
   const getSubmissionStatusLabel = (status: Application["status"]) => {
-    switch (status) {
-      case "pending":
-      case "reviewed":
-        return "Under Review";
-      case "accepted":
-        return "Verified";
-      case "rejected":
-        return "Needs Attention";
-      default:
-        return status;
-    }
+    // ... logic same as before or simplified
+    if (status === 'accepted') return "Verified";
+    if (status === 'rejected') return "Needs Attention";
+    return "Under Review";
   };
-  const pendingApplications = totalApplications.filter(
+
+  const pendingApplications = safeApps.filter(
     (app) => app.status === "pending"
   );
-  const acceptedApplications = totalApplications.filter(
-    (app) => app.status !== "pending" && app.status !== "rejected"
+  const acceptedApplications = safeApps.filter(
+    (app) => app.status === "accepted" // Strict check "Verified"
   );
 
   const stats = [
     {
       label: "Active Jobs",
-      value: companyJobs.filter((job) => job.status === "active").length,
+      value: safeJobs.filter((job) => job.status === "active").length,
       icon: Briefcase,
       color: "bg-blue-500",
-      trend: "+12%",
+      trend: "--", // trend logic requires history, leaving placeholder
     },
     {
       label: "Total Submissions",
-      value: totalApplications.length,
+      value: safeApps.length,
       icon: Users,
       color: "bg-green-500",
-      trend: "+8%",
+      trend: "--",
     },
     {
       label: "Under Review",
       value: pendingApplications.length,
       icon: Clock,
       color: "bg-yellow-500",
-      trend: "+3%",
+      trend: "--",
     },
     {
       label: "Verified",
       value: acceptedApplications.length,
       icon: UserCheck,
       color: "bg-purple-500",
-      trend: "+15%",
+      trend: "--",
     },
   ];
 
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-6 bg-gradient-to-r from-blue-50 via-white to-amber-50">
-          <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
-            Welcome back, Tech Innovators Inc
-          </h1>
-          <p className="text-slate-600 mt-1">
-            Here's what's happening in your review queue today.
-          </p>
+        <div className="px-6 py-6 bg-gradient-to-r from-blue-50 via-white to-amber-50 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-2">
+              Welcome back, {companyUser?.companyName || companyUser?.name || "Company"}
+              {companyUser?.verification?.status === "verified" && (
+                <ShieldCheck className="w-6 h-6 text-blue-600" aria-label="Verified Company" />
+              )}
+            </h1>
+            <p className="text-slate-600 mt-1">
+              Here's what's happening in your review queue today.
+            </p>
+          </div>
+
+          <div>
+            {companyUser?.verification?.status === "verified" ? (
+              <div className="flex items-center space-x-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium">
+                <ShieldCheck className="w-5 h-5" />
+                <span>Verified Company</span>
+              </div>
+            ) : (
+              <button
+                onClick={handleVerify}
+                disabled={verifying}
+                className="flex items-center space-x-2 px-4 py-2 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition-colors font-medium disabled:opacity-50"
+              >
+                {verifying ? (
+                  <span>Verifying...</span>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-5 h-5" />
+                    <span>Verify Company</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -179,9 +140,8 @@ export const CompanyOverview: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center mt-4 text-sm">
-                <TrendingUp className="w-4 h-4 text-emerald-600 mr-1" />
-                <span className="text-emerald-700 font-medium">{stat.trend}</span>
-                <span className="text-slate-500 ml-1">vs last month</span>
+                {/* Trend removed as we don't have historical data store yet */}
+                <span className="text-slate-500">Real-time stats</span>
               </div>
             </div>
           );
@@ -196,7 +156,7 @@ export const CompanyOverview: React.FC = () => {
             <Eye className="w-5 h-5 text-gray-400" />
           </div>
           <div className="space-y-3">
-            {companyJobs.slice(0, 3).map((job) => (
+            {safeJobs.slice(0, 3).map((job) => (
               <div
                 key={job.id}
                 className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-xl"
@@ -208,16 +168,16 @@ export const CompanyOverview: React.FC = () => {
                   </p>
                 </div>
                 <span
-                  className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    job.status === "active"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-gray-100 text-gray-800"
-                  }`}
+                  className={`px-2 py-1 text-xs font-medium rounded-full ${job.status === "active"
+                    ? "bg-green-100 text-green-800"
+                    : "bg-gray-100 text-gray-800"
+                    }`}
                 >
                   {job.status}
                 </span>
               </div>
             ))}
+            {safeJobs.length === 0 && <p className="text-sm text-gray-500">No active jobs found.</p>}
           </div>
         </div>
 
@@ -229,7 +189,7 @@ export const CompanyOverview: React.FC = () => {
             <Users className="w-5 h-5 text-gray-400" />
           </div>
           <div className="space-y-3">
-            {totalApplications.slice(0, 3).map((application) => (
+            {safeApps.slice(0, 3).map((application) => (
               <div
                 key={application.id}
                 className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-xl"
@@ -244,22 +204,21 @@ export const CompanyOverview: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <span
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${
-                      application.status === "pending"
-                        ? "bg-amber-50 text-amber-800 border-amber-200"
-                        : application.status === "reviewed"
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${application.status === "pending"
+                      ? "bg-amber-50 text-amber-800 border-amber-200"
+                      : application.status === "reviewed"
                         ? "bg-blue-50 text-blue-800 border-blue-200"
                         : application.status === "accepted"
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                        : "bg-red-50 text-red-800 border-red-200"
-                    }`}
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          : "bg-red-50 text-red-800 border-red-200"
+                      }`}
                   >
                     {getSubmissionStatusLabel(application.status)}
                   </span>
-                  {/* Compatibility UI disabled */}
                 </div>
               </div>
             ))}
+            {safeApps.length === 0 && <p className="text-sm text-gray-500">No submissions yet.</p>}
           </div>
         </div>
       </div>

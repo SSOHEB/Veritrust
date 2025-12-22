@@ -3,7 +3,7 @@ import { createContext } from "react";
 import type { PublicClient, WalletClient } from "viem";
 
 interface GlobalContextType {
-  user: any | null;
+  user: User | null;
   login: (
     email: string,
     password: string,
@@ -18,7 +18,7 @@ interface GlobalContextType {
   jobPublicClient: PublicClient | undefined;
   jobWalletClient: WalletClient | undefined;
   contractAddress: string;
-  job: Job[] | undefined;
+  companyJobs: Job[] | undefined;
   allJobs: Job[] | undefined;
   myApplication: Application[] | undefined;
   companyApplications: Application[] | undefined;
@@ -31,8 +31,9 @@ interface GlobalContextType {
   ) => Promise<void>;
   updateApplicationStatus?: (
     applicationId: string,
-    status: "approved" | "rejected"
+    status: Application["status"] // "pending" | "reviewed" | "accepted" | "rejected"
   ) => Promise<void>;
+  verifyCompany: () => Promise<void>;
 }
 
 export const GlobalContext = createContext<GlobalContextType>({
@@ -44,9 +45,10 @@ export const GlobalContext = createContext<GlobalContextType>({
   jobPublicClient: undefined,
   jobWalletClient: undefined,
   contractAddress: "",
-  job: undefined,
+  companyJobs: undefined,
   allJobs: undefined,
   myApplication: undefined,
   companyApplications: undefined,
   uploadZKProof: async () => { },
+  verifyCompany: async () => { },
 });

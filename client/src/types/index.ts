@@ -14,32 +14,13 @@ export interface Company extends User {
   description: string;
   website?: string;
   logo?: string;
+  verification?: {
+    status: "verified" | "unverified" | "rejected";
+    verifiedAt: string;
+  };
 }
 
-// {
-//     "candidateId": "jaydeep.dey03@gmail.com",
-//     "name": "Jaydeep Candidate",
-//     "description": [
-//         "Passionate full-stack developer with 5+ years of experience in React and modern web technologies. Love building user-friendly applications and learning new technologies."
-//     ],
-//     "contacts": [
-//         "jaydeep.dey03@gmail.com",
-//         "+1-555-0123",
-//         "Bangalore, IN"
-//     ],
-//     "education": [
-//         "BTech Computer Science - VIT University"
-//     ],
-//     "skills": [
-//         "Typescript",
-//         "React",
-//         "Javascript"
-//     ],
-//     "resumePath": [
-//         "/Users/jaydeepdey/Desktop/doc/Resume_Jaydeep_2024.pdf"
-//     ],
-//     "profileScore": ""
-// }
+// ... (comment block)
 
 // Candidate data is currently consumed from multiple sources (contract + legacy UI mocks).
 // Keep the type flexible so the app can compile while we progressively align shapes.
@@ -64,6 +45,19 @@ export interface Candidate {
   location?: string;
   bio?: string;
   phone?: string;
+
+  // Verification fields
+  zkVerification?: {
+    isVerified: boolean;
+    proofId: string;
+    verifiedAt: string;
+  };
+  blockchainStamp?: {
+    txHash: string;
+    network: string; // "Simulated Ethereum"
+    blockNumber: number;
+    timestamp: string;
+  };
 }
 
 export interface Job {

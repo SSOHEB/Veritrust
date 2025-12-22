@@ -2,158 +2,16 @@ import React from "react";
 import type { Candidate, Application, Job, Company } from "../types";
 import { FileText, TrendingUp, Eye, CheckCircle, Clock } from "lucide-react";
 
-// Mock candidate data
-const mockCandidate: Candidate = {
-  candidateId: "2",
-  email: "john.developer@example.com",
-  name: "John Developer",
-  description: ["Passionate developer with 5+ years of experience"],
-  contacts: ["john.developer@example.com", "+1-555-0123", "San Francisco, CA"],
-  education: ["BS Computer Science"],
-  skills: ["React", "TypeScript", "Node.js", "JavaScript"],
-  resumePath: [""],
-  profileScore: "",
-};
-
-// Mock data
-const mockApplications: Application[] = [
-  {
-    id: "1",
-    jobId: "1",
-    candidateId: "2",
-    job: {
-      id: "1",
-      companyId: "1",
-      company: {
-        id: "1",
-        name: "Tech Innovators Inc",
-        companyName: "Tech Innovators Inc",
-        industry: "Technology",
-        size: "100-500",
-        description: "Leading software development company",
-      } as Company,
-      title: "Senior Frontend Developer",
-      description: "Looking for a skilled Frontend Developer",
-      requirements: ["5+ years React experience", "TypeScript proficiency"],
-      skills: ["React", "TypeScript", "JavaScript"],
-      location: "San Francisco, CA",
-      type: "full-time",
-      salary: { min: 120000, max: 180000, currency: "USD" },
-      postedAt: "2024-01-10",
-      status: "active",
-    } as Job,
-    candidate: {
-      id: "2",
-      email: "candidate@demo.com",
-      name: "John Developer",
-      type: "candidate",
-      createdAt: "2024-01-01",
-      title: "Senior Frontend Developer",
-      experience: 5,
-      skills: ["React", "TypeScript", "Node.js"],
-      location: "San Francisco, CA",
-      bio: "Passionate developer",
-      education: "BS Computer Science",
-    } as Candidate,
-    status: "pending",
-    appliedAt: "2024-01-15",
-    // Extra fields removed
-  },
-  {
-    id: "2",
-    jobId: "2",
-    candidateId: "2",
-    job: {
-      id: "2",
-      companyId: "1",
-      company: {
-        id: "1",
-        name: "Startup",
-        companyName: "Startup",
-        industry: "Technology",
-        size: "50-100",
-        description: "High-growth software company",
-      } as Company,
-      title: "Backend Engineer",
-      description: "Backend engineering position",
-      requirements: ["Python", "SQL", "3+ years experience"],
-      skills: ["Python", "SQL", "APIs"],
-      location: "Remote",
-      type: "full-time",
-      salary: { min: 130000, max: 200000, currency: "USD" },
-      postedAt: "2024-01-12",
-      status: "active",
-    } as Job,
-    candidate: {
-      id: "2",
-      email: "candidate@demo.com",
-      name: "John Developer",
-      type: "candidate",
-      createdAt: "2024-01-01",
-      title: "Senior Frontend Developer",
-      experience: 5,
-      skills: ["React", "TypeScript", "Node.js"],
-      location: "San Francisco, CA",
-      bio: "Passionate developer",
-      education: "BS Computer Science",
-    } as Candidate,
-    status: "reviewed",
-    appliedAt: "2024-01-14",
-    // Extra fields removed
-  },
-];
-
-const mockJobs: Job[] = [
-  {
-    id: "3",
-    companyId: "1",
-    company: {
-      id: "1",
-      name: "Tech Corp",
-      companyName: "Tech Corp",
-      industry: "Technology",
-      size: "500-1000",
-      description: "Leading technology company",
-    } as Company,
-    title: "Senior React Developer",
-    description: "Looking for experienced React developer",
-    requirements: ["React", "TypeScript", "5+ years experience"],
-    skills: ["React", "TypeScript", "JavaScript", "Node.js"],
-    location: "San Francisco, CA",
-    type: "full-time",
-    salary: { min: 140000, max: 190000, currency: "USD" },
-    postedAt: "2024-01-16",
-    status: "active",
-  },
-  {
-    id: "4",
-    companyId: "2",
-    company: {
-      id: "2",
-      name: "StartupCo",
-      companyName: "StartupCo",
-      industry: "Technology",
-      size: "10-50",
-      description: "Fast-growing startup",
-    } as Company,
-    title: "Full Stack Engineer",
-    description: "Full stack development role",
-    requirements: ["JavaScript", "Node.js", "React"],
-    skills: ["JavaScript", "Node.js", "React", "PostgreSQL"],
-    location: "Remote",
-    type: "full-time",
-    salary: { min: 100000, max: 150000, currency: "USD" },
-    postedAt: "2024-01-14",
-    status: "active",
-  },
-];
+import { useGlobalContext } from "@/Context/useGlobalContext";
 
 export const CandidateOverview: React.FC = () => {
-  const candidate = mockCandidate;
+  const { user, myApplication, allJobs } = useGlobalContext();
 
-  const candidateApplications = mockApplications.filter(
-    (app: Application) => app.candidateId === candidate.candidateId
-  );
+  // Safe cast or check
+  const candidate = user?.type === 'candidate' ? (user as Candidate) : null;
+
+  const candidateApplications = myApplication || [];
+
   const pendingApplications = candidateApplications.filter(
     (app: Application) => app.status === "pending"
   );
@@ -167,7 +25,7 @@ export const CandidateOverview: React.FC = () => {
       value: candidateApplications.length,
       icon: FileText,
       color: "bg-blue-500",
-      trend: "+5 this week",
+      trend: "+0 this week", // dynamic calculation complex, static for now or calculate if date available
     },
     {
       label: "Under Review",
@@ -183,10 +41,9 @@ export const CandidateOverview: React.FC = () => {
       color: "bg-green-500",
       trend: "Credentials verified",
     },
-    // Extra stat removed
   ];
 
-  const recentJobs = mockJobs.slice(0, 4);
+  const recentJobs = (allJobs || []).slice(0, 4);
 
   const getStatusLabel = (status: Application["status"]) => {
     switch (status) {
@@ -201,6 +58,10 @@ export const CandidateOverview: React.FC = () => {
         return status;
     }
   };
+
+  if (!candidate) {
+    return <div className="p-6">Please log in as a candidate.</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -284,15 +145,14 @@ export const CandidateOverview: React.FC = () => {
                       </p>
                       <div className="flex items-center space-x-2 mt-1">
                         <span
-                          className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${
-                            application.status === "pending"
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${application.status === "pending"
                               ? "bg-amber-50 text-amber-800 border-amber-200"
                               : application.status === "reviewed"
-                              ? "bg-blue-50 text-blue-800 border-blue-200"
-                              : application.status === "accepted"
-                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                              : "bg-red-50 text-red-800 border-red-200"
-                          }`}
+                                ? "bg-blue-50 text-blue-800 border-blue-200"
+                                : application.status === "accepted"
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                  : "bg-red-50 text-red-800 border-red-200"
+                            }`}
                         >
                           {getStatusLabel(application.status)}
                         </span>

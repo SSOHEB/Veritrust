@@ -2,9 +2,9 @@ import React, { useEffect, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import type { Candidate } from "../types";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { onAuthStateChanged } from "firebase/auth";
 import { doc, getFirestore, type Timestamp, onSnapshot, setDoc } from "firebase/firestore";
 import { app, auth } from "@/lib/firebase";
+import { useGlobalContext } from "@/Context/useGlobalContext";
 import {
   User,
   Mail,
@@ -17,6 +17,7 @@ import {
   X,
   Plus,
   Star,
+  ShieldCheck,
 } from "lucide-react";
 
 // Initial empty candidate
@@ -48,6 +49,7 @@ type ProfileFormData = {
 
 export const Profile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
+  const { user, uploadZKProof } = useGlobalContext();
 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -64,48 +66,47 @@ export const Profile: React.FC = () => {
 
   // Sync candidate data from Firestore
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        setCandidate(initialCandidate);
-        return;
-      }
+    if (!user?.id) {
+      setCandidate(initialCandidate);
+      return;
+    }
 
-      const db = getFirestore(app);
-      const userRef = doc(db, "users", user.uid);
+    const db = getFirestore(app);
+    // Use user.id from GlobalContext (trusted source)
+    const userRef = doc(db, "users", user.id);
 
-      const unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          // Update candidate state
-          setCandidate({ ...initialCandidate, ...data } as Candidate);
+    const unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        // Update candidate state
+        setCandidate({ ...initialCandidate, ...data } as Candidate);
 
-          // Also handle AI feedback from the same document if present
-          if (data.aiProfileFeedback) {
-            const saved = data.aiProfileFeedback;
-            const strengths = Array.isArray(saved.strengths)
-              ? saved.strengths.filter((s: unknown) => typeof s === "string")
-              : [];
-            const suggestions = Array.isArray(saved.suggestions)
-              ? saved.suggestions.filter((s: unknown) => typeof s === "string")
-              : [];
-            const exampleRewrite =
-              typeof saved.exampleRewrite === "string" ? saved.exampleRewrite : "";
+        // Also handle AI feedback from the same document if present
+        if (data.aiProfileFeedback) {
+          const saved = data.aiProfileFeedback;
+          const strengths = Array.isArray(saved.strengths)
+            ? saved.strengths.filter((s: unknown) => typeof s === "string")
+            : [];
+          const suggestions = Array.isArray(saved.suggestions)
+            ? saved.suggestions.filter((s: unknown) => typeof s === "string")
+            : [];
+          const exampleRewrite =
+            typeof saved.exampleRewrite === "string" ? saved.exampleRewrite : "";
 
-            setAiFeedback({ strengths, suggestions, exampleRewrite });
+          setAiFeedback({ strengths, suggestions, exampleRewrite });
 
-            const ts = saved.updatedAt as Timestamp | undefined;
-            if (ts && typeof (ts as any).toDate === "function") {
-              setAiFeedbackUpdatedAt(ts.toDate().toLocaleString());
-            }
+          const ts = saved.updatedAt as Timestamp | undefined;
+          if (ts && typeof (ts as any).toDate === "function") {
+            setAiFeedbackUpdatedAt(ts.toDate().toLocaleString());
           }
         }
-      });
-
-      return () => unsubscribeSnapshot();
+      }
+    }, (error) => {
+      console.error("Profile listener error:", error);
     });
 
-    return () => unsubscribeAuth();
-  }, []);
+    return () => unsubscribeSnapshot();
+  }, [user?.id]); // Only re-run if user ID changes
 
   const {
     register,
@@ -561,9 +562,34 @@ export const Profile: React.FC = () => {
               Verified Profile & Documents
             </h3>
           </div>
-          <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-            Upload Document
-          </button>
+          {candidate.zkVerification?.isVerified ? (
+            <div className="flex items-center space-x-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg font-medium border border-green-200">
+              <ShieldCheck className="w-5 h-5" />
+              <span>zkPDF Verified</span>
+            </div>
+          ) : (
+            <label className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2">
+              <input
+                type="file"
+                className="hidden"
+                accept=".pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file && user?.id) {
+                    // Trigger upload simulation
+                    uploadZKProof(
+                      "resume_verification", // ID or random
+                      "resume",
+                      file,
+                      "candidate",
+                      "Candidate Resume"
+                    ).catch(err => console.error(err));
+                  }
+                }}
+              />
+              <span>Verify Resume (zkProof)</span>
+            </label>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

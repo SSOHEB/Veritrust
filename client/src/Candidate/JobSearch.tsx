@@ -11,6 +11,7 @@ import {
   Building2,
   Briefcase,
   CheckCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { useGlobalContext } from "@/Context/useGlobalContext";
 import { getFirestore, collection, addDoc } from "firebase/firestore";
@@ -62,11 +63,25 @@ export const JobSearch: React.FC = () => {
     const db = getFirestore(app);
     try {
       const applicationId = uuidv4();
+
+      // SINGLE SOURCE OF TRUTH: The Recruiter's Auth ID (job.company.id).
+      // We DO NOT trust the denormalized string 'companyId' as it may be stale or inconsistent.
+      // If job.company object is missing, the application cannot be correctly routed.
+      const targetCompanyId = job.company?.id;
+
+      console.log("JobSearch: APPLICATION WRITE companyId:", targetCompanyId, "source: job.company.id");
+
+      if (!targetCompanyId) {
+        console.error("Critical Data Error: Job is missing denormalized 'company' object or ID.", job);
+        alert("Cannot apply: The job posting data is incomplete (missing Employer ID). Please contact support.");
+        return;
+      }
+
       await addDoc(collection(db, "applications"), {
         id: applicationId, // Store ID inside doc as well if needed, or rely on doc.id
         jobId: job.id,
         candidateId: user.id,
-        companyId: job.companyId,
+        companyId: targetCompanyId, // Explicitly set resolved companyId
         status: "pending",
         appliedAt: new Date().toISOString(),
         // Store snapshot of job/candidate for easier display without joins
@@ -186,8 +201,11 @@ export const JobSearch: React.FC = () => {
                       </div>
 
                       <div className="flex items-center space-x-2 mb-3">
-                        <h4 className="text-lg font-medium text-gray-700">
+                        <h4 className="text-lg font-medium text-gray-700 flex items-center gap-1">
                           {job.company?.companyName || "Company"}
+                          {job.company?.verification?.status === "verified" && (
+                            <ShieldCheck className="w-4 h-4 text-blue-600" aria-label="Verified Company" />
+                          )}
                         </h4>
                         <span className="text-gray-400">•</span>
                         <span className="text-gray-600">

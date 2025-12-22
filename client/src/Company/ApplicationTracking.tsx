@@ -38,70 +38,20 @@ export const ApplicationTracking: React.FC = () => {
     newStatus: Application["status"]
   ) => {
     if (updateApplicationStatus) {
-      // Map Application["status"] which can be "pending" | "reviewed" | "accepted" | "rejected"
-      // to what updateApplicationStatus expects.
-      // The GlobalContext updateApplicationStatus expects "approved" | "rejected".
-      // Wait, looking at GlobalContext definition:
-      /*
-        const updateApplicationStatus = async (
-          applicationId: string,
-          newStatus: "approved" | "rejected"
-        )
-      */
-      // And inside it maps "approved" -> "accepted". 
-      // This mismatch in naming needs handling.
-      // "reviewed" is not handled in GlobalContext's updateApplicationStatus explicitly in the signature I saw earlier? 
-      // I should check if I need to update GlobalContext or just adapt here.
-      // GlobalContext.tsx:
-      /*
-         const updateApplicationStatus = async (
-           applicationId: string,
-           newStatus: "approved" | "rejected"
-         )
-      */
-      // This seems limiting if I want to set "reviewed".
-      // However, I can just use raw Firestore update here since I am inside a component that imports everything anyway?
-      // NO, the plan says "GlobalContext is the single source for shared Firestore data."
-      // But if GlobalContext function is limited, I should probably update `GlobalContext` later or now.
-      // Or I can just pass "approved" | "rejected" to it.
-      // BUT "reviewed" is a valid status in the UI.
-
-      // DECISION: To avoid changing GlobalContext signature again and risking breakage (and since I am allowed to edit files "One file at a time"), 
-      // I will import firestore directly here for the status update to support all statuses ("reviewed", "accepted", "rejected"),
-      // OR I can use the existing function if I stick to "approved"/"rejected".
-      // The UI has "reviewed", "accepted", "rejected".
-      // I will use direct firestore update here for full flexibility and speed, as this component is "owner" of this action in the dashboard.
-      // Actually, GlobalContext is better for "single source", but the existing function is too specific ("approved" vs "accepted").
-      // I'll stick to direct Firestore update for this specialized dashboard action to support all statuses without refactoring Context again.
-      // Wait, `updateApplicationStatus` in `GlobalContext` was simple wrapper around `updateDoc`.
-      // I will just use `updateDoc` here.
-
-      // NO, I should try to respecting the architecture. 
-      // But `reviewed` is missing in `updateApplicationStatus`.
-      // Let's just import firebase here. It's safe and cleaner than half-support.
-    }
-  };
-
-  const updateStatusDirectly = async (applicationId: string, newStatus: string) => {
-    const { getFirestore, doc, updateDoc } = await import("firebase/firestore"); // Dynamic import or top level? Top level is better.
-    const { app } = await import("@/lib/firebase");
-    const db = getFirestore(app);
-    try {
-      await updateDoc(doc(db, "applications", applicationId), {
-        status: newStatus
-      });
+      await updateApplicationStatus(applicationId, newStatus);
 
       // Update local state if selected
       if (selectedApplication && selectedApplication.id === applicationId) {
         setSelectedApplication({
           ...selectedApplication,
-          status: newStatus as any,
+          status: newStatus,
         });
       }
-    } catch (err) {
-      console.error("Failed to update status", err);
     }
   };
+
+  // Removed updateStatusDirectly in favor of updateApplicationStatus from GlobalContext
+
 
   return (
     <div className="space-y-6">
@@ -120,8 +70,8 @@ export const ApplicationTracking: React.FC = () => {
           <button
             onClick={() => setSelectedStatus("all")}
             className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${selectedStatus === "all"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
           >
             All ({(companyApplications || []).length})
@@ -135,8 +85,8 @@ export const ApplicationTracking: React.FC = () => {
                 key={status}
                 onClick={() => setSelectedStatus(status)}
                 className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${selectedStatus === status
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
               >
                 {config.label} ({count})
@@ -258,7 +208,7 @@ export const ApplicationTracking: React.FC = () => {
                           <>
                             <button
                               onClick={() =>
-                                updateStatusDirectly(application.id, "reviewed")
+                                handleStatusUpdate(application.id, "reviewed")
                               }
                               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
                             >
@@ -266,7 +216,7 @@ export const ApplicationTracking: React.FC = () => {
                             </button>
                             <button
                               onClick={() =>
-                                updateStatusDirectly(application.id, "rejected")
+                                handleStatusUpdate(application.id, "rejected")
                               }
                               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
                             >
@@ -280,7 +230,7 @@ export const ApplicationTracking: React.FC = () => {
                             {application.status === "reviewed" && (
                               <button
                                 onClick={() =>
-                                  updateStatusDirectly(application.id, "accepted")
+                                  handleStatusUpdate(application.id, "accepted")
                                 }
                                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
                               >
@@ -292,7 +242,7 @@ export const ApplicationTracking: React.FC = () => {
                             {application.status === "reviewed" && (
                               <button
                                 onClick={() =>
-                                  updateStatusDirectly(application.id, "rejected")
+                                  handleStatusUpdate(application.id, "rejected")
                                 }
                                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
                               >

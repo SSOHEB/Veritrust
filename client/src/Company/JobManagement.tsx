@@ -61,7 +61,7 @@ type JobFormData = z.infer<typeof jobFormSchema>;
 export const JobManagement: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const {
-    job: companyJobs,
+    companyJobs,
     user,
     companyApplications
   } = useGlobalContext();
@@ -339,8 +339,8 @@ export const JobManagement: React.FC = () => {
                     </h3>
                     <span
                       className={`px-3 py-1 text-xs font-medium rounded-full ${job.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-800"
                         }`}
                     >
                       {job.status}
