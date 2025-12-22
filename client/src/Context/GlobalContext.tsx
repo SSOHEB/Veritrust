@@ -116,9 +116,9 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
   }, [user?.id, user?.type]); // Re-run if user ID or Type changes
 
   const login = async (
-    email: string,
+    _email: string,
     _password: string,
-    type: "company" | "candidate"
+    _type: "company" | "candidate"
   ) => {
     // NOTE: Login is handled by LoginForm.tsx via signInWithPopup.
     // This function is kept for interface compatibility but may not be used directly for Auth changes.
@@ -127,8 +127,8 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (
-    userData: Partial<User>,
-    type: "company" | "candidate"
+    _userData: Partial<User>,
+    _type: "company" | "candidate"
   ) => {
     // NOTE: Registration mostly happens via profile creation or post-auth hook.
     // Interface stub preserved.
