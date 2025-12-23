@@ -31,6 +31,21 @@ export interface Company extends User {
   };
 }
 
+export interface Organization {
+  id: string; // matches User ID for now
+  companyName: string;
+  domain: string;
+  description: string;
+  industry?: string;
+  size?: string;
+  logo?: string;
+  verification: {
+    zkVerified: boolean;
+    blockchainStamped: boolean;
+    verifiedAt?: string;
+  };
+}
+
 // ... (comment block)
 
 // Candidate data is currently consumed from multiple sources (contract + legacy UI mocks).

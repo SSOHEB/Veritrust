@@ -18,6 +18,7 @@ import {
   Plus,
   Star,
   ShieldCheck,
+  Upload,
 } from "lucide-react";
 
 // Initial empty candidate
@@ -49,6 +50,7 @@ type ProfileFormData = {
 
 export const Profile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const { user, uploadZKProof } = useGlobalContext();
 
   const [aiLoading, setAiLoading] = useState(false);
@@ -485,30 +487,55 @@ export const Profile: React.FC = () => {
                 </h3>
               </div>
               {candidate.zkVerification?.isVerified ? (
-                <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold text-xs border border-emerald-200 tracking-wide flex items-center gap-1 shadow-sm">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  VERIFIED
-                </span>
+                <div className="flex flex-col items-end">
+                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold text-xs border border-emerald-200 tracking-wide flex items-center gap-1 shadow-sm">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    VERIFIED
+                  </span>
+                  <span className="text-[10px] text-slate-500 mt-1 font-mono">{candidate.zkVerification.verifiedAt ? new Date(candidate.zkVerification.verifiedAt).toLocaleDateString() : ""}</span>
+                </div>
               ) : (
-                <label className="cursor-pointer px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all font-semibold text-sm flex items-center gap-2 shadow-sm hover:translate-y-[-1px]">
+                <label className={`cursor-pointer px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all font-semibold text-sm flex items-center gap-2 shadow-sm hover:translate-y-[-1px] ${isVerifying ? 'opacity-75 cursor-not-allowed' : ''}`}>
                   <input
                     type="file"
                     className="hidden"
                     accept=".pdf"
-                    onChange={(e) => {
+                    disabled={isVerifying}
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (file && user?.id) {
-                        uploadZKProof(
-                          "resume_verification",
-                          "resume",
-                          file,
-                          "candidate",
-                          "Candidate Resume"
-                        ).catch(err => console.error(err));
+                        try {
+                          setIsVerifying(true);
+                          await uploadZKProof(
+                            "resume_verification",
+                            "resume",
+                            file,
+                            "candidate",
+                            "Candidate Resume"
+                          );
+                          // No need to manually set candidate state here as the onSnapshot listener will pick up the change
+                        } catch (err) {
+                          console.error(err);
+                          alert("Verification failed. Please try again.");
+                        } finally {
+                          setIsVerifying(false);
+                        }
                       }
                     }}
                   />
-                  <span>Upload zkPDF</span>
+                  <div className="flex items-center gap-2">
+                    {isVerifying ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Verifying...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        <span>Upload Resume / Certificate</span>
+                      </>
+                    )}
+                  </div>
                 </label>
               )}
             </div>
@@ -690,7 +717,7 @@ export const Profile: React.FC = () => {
           </div>
         </div>
       </div>
-    </form>
+    </form >
 
   );
 };

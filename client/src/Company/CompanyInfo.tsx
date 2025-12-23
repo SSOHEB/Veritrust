@@ -1,50 +1,61 @@
 import {
-  Building2,
-  Globe,
-  Users,
-  Star,
   Edit,
   Upload,
   Save,
-  X,
   FileCheck,
   ShieldCheck,
   CheckCircle,
-  FileText
+  FileText,
+  Globe
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 import React, { useState } from 'react';
 import { useGlobalContext } from '../Context/useGlobalContext';
-import type { Company } from '../types';
+import type { Organization } from '../types';
 
-const mockCompany: Company = {
-  id: "mock-company-1",
-  email: "company@example.com",
-  name: "Tech Corp",
-  type: "company",
-  createdAt: new Date().toISOString(),
-  companyName: "Tech Corp",
-  industry: "Technology",
-  size: "100-500",
-  description: "Innovative tech solutions.",
-  verification: {
-    status: "unverified",
-    verifiedAt: ""
-  }
-};
+
 
 const CompanyInfo: React.FC = () => {
+  const { verifyCompany, user, organization, updateOrganization } = useGlobalContext();
   const [isEditing, setIsEditing] = useState(false);
-  const [company, setCompany] = useState<Company>(mockCompany);
-  const { jobPublicClient, jobWalletClient, contractAddress, verifyCompany, user } = useGlobalContext();
+  const [formData, setFormData] = useState<Partial<Organization>>({});
   const [isVerifying, setIsVerifying] = useState(false);
 
-  // Safe cast since this component is for Company views
-  const companyUser = user?.type === 'company' ? (user as Company) : null;
+  // Initialize form data when organization data loads or changes
+  React.useEffect(() => {
+    if (organization) {
+      setFormData(organization);
+    } else if (user?.type === 'company') {
+      // Defaults if new
+      setFormData({
+        companyName: user.name || "",
+        description: "",
+        domain: "",
+        verification: {
+          zkVerified: false,
+          blockchainStamped: false
+        }
+      });
+    }
+  }, [organization, user]);
 
-  // ... form setup ...
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSave = async () => {
+    try {
+      if (updateOrganization) {
+        await updateOrganization(formData);
+        setIsEditing(false);
+      }
+    } catch (e) {
+      console.error("Failed to save organization info", e);
+    }
+  };
 
   const handleVerificationUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -61,9 +72,13 @@ const CompanyInfo: React.FC = () => {
     }
   };
 
-  const isVerified = companyUser?.verification?.status === "verified";
-  const zkData = companyUser?.zkVerification;
-  const blockchainData = companyUser?.blockchainStamp;
+  const isVerified = organization?.verification?.zkVerified;
+  const zkData = organization?.verification; // Simplified for now, mapped from old model if needed
+  // Note: Previous model had zkVerification distinct from verification status.
+  // Our new model has verification.zkVerified.
+  // If we want detailed proof data, we might need to expand Organization type or map it.
+
+  // For MVP, we assume verifyCompany updates organization.verification.
 
   return (
     <div className="space-y-6">
@@ -143,7 +158,7 @@ const CompanyInfo: React.FC = () => {
                   </div>
                   <div className="flex justify-between py-2 border-b border-slate-200/60">
                     <span className="text-slate-500 font-medium">Proof Hash</span>
-                    <span className="font-mono text-xs text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">{zkData?.proofId || "zkp_simulated"}</span>
+                    <span className="font-mono text-xs text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">zkp_{organization?.id?.substr(0, 8) || "simulated"}</span>
                   </div>
                   <div className="flex justify-between py-2">
                     <span className="text-slate-500 font-medium">Timestamp</span>
@@ -166,17 +181,17 @@ const CompanyInfo: React.FC = () => {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between py-2 border-b border-slate-200/60">
                     <span className="text-slate-500 font-medium">Network</span>
-                    <span className="text-slate-900 font-semibold">{blockchainData?.network || "Simulated Mainnet"}</span>
+                    <span className="text-slate-900 font-semibold">Simulated Ethereum</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-slate-200/60">
                     <span className="text-slate-500 font-medium">Transaction</span>
                     <div className="flex items-center gap-1">
-                      <span className="font-mono text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded truncate max-w-[120px]">{blockchainData?.txHash || "0x..."}</span>
+                      <span className="font-mono text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded truncate max-w-[120px]">0x{organization?.id}</span>
                     </div>
                   </div>
                   <div className="flex justify-between py-2">
                     <span className="text-slate-500 font-medium">Block Height</span>
-                    <span className="font-mono text-slate-700 text-xs">#{blockchainData?.blockNumber}</span>
+                    <span className="font-mono text-slate-700 text-xs">#12345678</span>
                   </div>
                 </div>
               </div>
@@ -185,18 +200,79 @@ const CompanyInfo: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Basic Information */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          {/* ... rest of existing Basic Information card ... */}
-        </Card>
-        {/* ... existing Performance card ... */}
-      </div>
-
-      {/* Existing Performance Card moved into grid above, ensure closing tags align */}
+      {/* Organization Information Form */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="font-serif">Organization Profile</CardTitle>
+          {!isEditing ? (
+            <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+              <Edit className="w-4 h-4 mr-2" /> Edit Details
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>Cancel</Button>
+              <Button size="sm" onClick={handleSave}><Save className="w-4 h-4 mr-2" /> Save</Button>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Company Name</label>
+              {isEditing ? (
+                <input
+                  name="companyName"
+                  value={formData.companyName || ""}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border rounded-md"
+                />
+              ) : (
+                <p className="text-slate-700 font-semibold text-lg">{formData.companyName || "Not set"}</p>
+              )}
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Description</label>
+              {isEditing ? (
+                <textarea
+                  name="description"
+                  value={formData.description || ""}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="w-full px-3 py-2 border rounded-md"
+                />
+              ) : (
+                <p className="text-slate-600">{formData.description || "No description provided."}</p>
+              )}
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Domain / Website</label>
+              {isEditing ? (
+                <input
+                  name="domain"
+                  value={formData.domain || ""}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border rounded-md"
+                  placeholder="example.com"
+                />
+              ) : (
+                <div className="flex items-center gap-2">
+                  {formData.domain ? (
+                    <>
+                      <Globe className="w-4 h-4 text-slate-400" />
+                      <a href={`https://${formData.domain}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{formData.domain}</a>
+                    </>
+                  ) : <span className="text-slate-400 italic">Not set</span>}
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
     </div >
   );
 };
 
 export default CompanyInfo;
+
+

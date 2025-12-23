@@ -1,4 +1,4 @@
-import type { Application, Job, User } from "@/types";
+import type { Application, Job, User, Organization } from "@/types";
 import { createContext } from "react";
 import type { PublicClient, WalletClient } from "viem";
 
@@ -34,6 +34,8 @@ interface GlobalContextType {
     status: Application["status"] // "pending" | "reviewed" | "accepted" | "rejected"
   ) => Promise<void>;
   verifyCompany: () => Promise<void>;
+  organization: Organization | null;
+  updateOrganization: (orgData: Partial<Organization>) => Promise<void>;
 }
 
 export const GlobalContext = createContext<GlobalContextType>({
@@ -51,4 +53,6 @@ export const GlobalContext = createContext<GlobalContextType>({
   companyApplications: undefined,
   uploadZKProof: async () => { },
   verifyCompany: async () => { },
+  organization: null,
+  updateOrganization: async () => { },
 });

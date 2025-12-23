@@ -2,6 +2,7 @@ import type {
   Application,
   Job,
   User,
+  Organization,
 } from "@/types";
 import { useEffect, useState, type ReactNode } from "react";
 import { GlobalContext } from "./GlobalContextExport";
@@ -14,6 +15,7 @@ import {
   query,
   where,
   updateDoc,
+  setDoc,
 } from "firebase/firestore";
 import { app, auth } from "@/lib/firebase";
 
@@ -26,6 +28,7 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [myApplication, setMyApplication] = useState<Application[]>([]);
   const [companyApplications, setCompanyApplications] = useState<Application[]>([]);
+  const [organization, setOrganization] = useState<Organization | null>(null);
 
   // Defined as undefined since we removed direct contract interaction in this phase
   const jobPublicClient = undefined;
@@ -162,6 +165,19 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
           setCompanyApplications(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Application)));
         }, (err) => console.error("Company apps listener failed:", err));
         unsubs.push(appsUnsub);
+
+        // Fetch Organization Data
+        // We use user.id as the organization ID for now (1:1 mapping)
+        const orgUnsub = onSnapshot(doc(db, "organizations", user.id), (docSnap) => {
+          if (docSnap.exists()) {
+            setOrganization({ id: docSnap.id, ...docSnap.data() } as Organization);
+          } else {
+            // If missing, we might want to initialize it or leave null. 
+            // For now, leave null so UI knows to show "Complete Profile" or fallback.
+            setOrganization(null);
+          }
+        }, (err) => console.error("Organization listener failed:", err));
+        unsubs.push(orgUnsub);
       } catch (e) {
         console.error("Error setting up company listeners:", e);
       }
@@ -170,7 +186,10 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
       try {
         // Fetch My Applications
         const qApps = query(collection(db, "applications"), where("candidateId", "==", user.id));
+        console.log("GlobalContext: CANDIDATE QUERY APPS candidateId:", user.id);
         const appsUnsub = onSnapshot(qApps, (snapshot) => {
+          console.log("GlobalContext: CANDIDATE APPS SNAPSHOT SIZE:", snapshot.size);
+          snapshot.docs.forEach(d => console.log("Candidate App:", d.id, d.data().status));
           setMyApplication(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Application)));
         }, (err) => console.error("Candidate apps listener failed:", err));
         unsubs.push(appsUnsub);
@@ -213,9 +232,16 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
     // newStatus is "pending" | "reviewed" | "accepted" | "rejected"
 
     try {
-      await updateDoc(doc(db, "applications", applicationId), {
+      console.log("Updating application status:", applicationId, newStatus);
+      await setDoc(doc(db, "applications", applicationId), {
         status: newStatus
-      });
+      }, { merge: true });
+
+      // Force local update to ensure UI reflects change immediately
+      setCompanyApplications(prev =>
+        prev.map(app => app.id === applicationId ? { ...app, status: newStatus } : app)
+      );
+
       // No need to setCompanyApplications locally; onSnapshot will handle it.
 
       // Legacy Contract Call (Optional - keeping for reference if contract sync is desired later)
@@ -303,6 +329,22 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
         blockchainStamp: blockchainStampData
       });
 
+      // Update Organization Entity as well if it exists
+      // If we verify the company, we should stamp the Organization doc too.
+      // This is duplicative but necessary for the transition.
+      try {
+        // Check if org exists first or just set merge
+        await setDoc(doc(db, "organizations", user.id), {
+          verification: {
+            zkVerified: true,
+            blockchainStamped: true,
+            verifiedAt: new Date().toISOString()
+          }
+        }, { merge: true });
+      } catch (err) {
+        console.warn("Could not update organization verification status", err);
+      }
+
       // 2. Propagate to all company jobs (Simulated relational update)
       const { getDocs, writeBatch } = await import("firebase/firestore");
       const jobsQuery = query(collection(db, "jobs"), where("companyId", "==", user.id));
@@ -328,6 +370,17 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateOrganization = async (orgData: Partial<Organization>) => {
+    if (!user?.id) return;
+    const db = getFirestore(app);
+    try {
+      await setDoc(doc(db, "organizations", user.id), orgData, { merge: true });
+    } catch (err) {
+      console.error("Error updating organization:", err);
+      throw err;
+    }
+  };
+
   return (
     <GlobalContext.Provider
       value={{
@@ -346,6 +399,8 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
         uploadZKProof,
         updateApplicationStatus,
         verifyCompany,
+        organization,
+        updateOrganization,
       }}
     >
       {children}

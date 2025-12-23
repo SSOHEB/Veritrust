@@ -1,8 +1,7 @@
-import type { Application, Company } from "@/types";
+import type { Application } from "@/types";
 import {
   Briefcase,
   Users,
-  TrendingUp,
   Clock,
   Eye,
   UserCheck,
@@ -13,10 +12,11 @@ import { useGlobalContext } from "@/Context/useGlobalContext";
 import { useState } from "react";
 
 export const CompanyOverview: React.FC = () => {
-  const { user, companyJobs, companyApplications, verifyCompany } = useGlobalContext();
+  const { user, companyJobs, companyApplications, verifyCompany, organization } = useGlobalContext();
   const [verifying, setVerifying] = useState(false);
 
-  const companyUser = user as Company; // Safe cast if we assume this component is protected by role guard
+  // const companyUser = user as Company; 
+
   // In a real app, we'd enable the guard or check type here.
 
   const safeJobs = companyJobs || [];
@@ -79,8 +79,8 @@ export const CompanyOverview: React.FC = () => {
         <div className="px-6 py-6 bg-gradient-to-r from-blue-50 via-white to-amber-50 flex justify-between items-center">
           <div>
             <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-2">
-              Welcome back, {companyUser?.companyName || companyUser?.name || "Company"}
-              {companyUser?.verification?.status === "verified" && (
+              Welcome back, {organization?.companyName || user?.name || "Company"}
+              {organization?.verification?.zkVerified && (
                 <ShieldCheck className="w-6 h-6 text-blue-600" aria-label="Verified Company" />
               )}
             </h1>
@@ -90,7 +90,7 @@ export const CompanyOverview: React.FC = () => {
           </div>
 
           <div>
-            {companyUser?.verification?.status === "verified" ? (
+            {organization?.verification?.zkVerified ? (
               <div className="flex items-center space-x-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium">
                 <ShieldCheck className="w-5 h-5" />
                 <span>Verified Company</span>
