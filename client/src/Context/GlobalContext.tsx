@@ -89,9 +89,16 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
     const userUnsub = onSnapshot(doc(db, "users", user.id), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+
+        // Compatibility: Map 'role' to 'type' (e.g., "recruiter" -> "company")
+        let derivedType = data.type;
+        if (!derivedType && data.role === "recruiter") {
+          derivedType = "company";
+        }
+
         const userData = {
-          type: "candidate", // Default fallback
           ...data,
+          type: derivedType || "candidate",
           id: user.id
         } as User;
         // Avoid infinite loop if data matches strict equality, but React useState handles that logic mostly.
@@ -146,7 +153,9 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
         unsubs.push(jobsUnsub);
 
         // Fetch Company Applications
-        console.log("GlobalContext: RECRUITER QUERY APPS companyId:", user.id);
+        console.log("GlobalContext: RECRUITER QUERY APPS companyId (auth uid):", user.id);
+        // FIXME: Company identity is currently derived from auth UID. This will be normalized post-MVP.
+        // We query nested job.company.id to match the current schema where job.company carries the ID.
         const qApps = query(collection(db, "applications"), where("companyId", "==", user.id));
         const appsUnsub = onSnapshot(qApps, (snapshot) => {
           console.log("GlobalContext: RECRUITER APPS SNAPSHOT SIZE:", snapshot.size, "for companyId:", user.id);
@@ -270,12 +279,28 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
 
     const db = getFirestore(app);
     try {
+      // Generate simulated proof data
+      const zkVerificationData = {
+        isVerified: true,
+        proofId: `zkp_${Math.random().toString(36).substr(2, 9)}`,
+        verifiedAt: new Date().toISOString()
+      };
+
+      const blockchainStampData = {
+        txHash: `0x${Math.random().toString(16).substr(2, 40)}`,
+        network: "Simulated Ethereum",
+        blockNumber: Math.floor(Math.random() * 10000000),
+        timestamp: new Date().toISOString()
+      };
+
       // 1. Update Company User Doc
       await updateDoc(doc(db, "users", user.id), {
         verification: {
           status: "verified",
           verifiedAt: new Date().toISOString()
-        }
+        },
+        zkVerification: zkVerificationData,
+        blockchainStamp: blockchainStampData
       });
 
       // 2. Propagate to all company jobs (Simulated relational update)
@@ -294,6 +319,7 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
           });
         });
         await batch.commit();
+
       }
 
       console.log("Company verified and jobs updated");

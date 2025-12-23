@@ -45,7 +45,12 @@ export const JobSearch: React.FC = () => {
       !locationFilter ||
       job.location.toLowerCase().includes(locationFilter.toLowerCase());
 
-    const matchesType = typeFilter === "all" || job.type === typeFilter;
+    const matchesType =
+      typeFilter === "all"
+        ? true
+        : typeFilter === "remote"
+          ? job.location.toLowerCase().includes("remote")
+          : job.type === typeFilter;
 
     return matchesSearch && matchesLocation && matchesType;
   });
@@ -102,41 +107,42 @@ export const JobSearch: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Find Jobs</h1>
-        <p className="text-gray-600 mt-1">
-          Browse openings and submit your verified profile
+    <div className="space-y-8">
+      <div className="bg-white p-8 rounded-2xl border border-teal-100 shadow-md bg-gradient-to-r from-teal-50/80 to-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-teal-100/30 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        <h1 className="text-4xl font-serif font-bold text-teal-950 relative z-10">Find Opportunities</h1>
+        <p className="text-teal-800/80 mt-2 font-medium text-lg relative z-10">
+          Browse verified openings and submit your student profile
         </p>
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-200">
         <div className="space-y-4">
-          <div className="flex space-x-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative group">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-teal-600 transition-colors" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-xl focus:ring-4 focus:ring-teal-500/20 focus:border-teal-500 focus:outline-none transition-all placeholder:text-slate-400 font-medium"
                 placeholder="Search jobs, organizations, or skills..."
               />
             </div>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <div className="relative md:w-72 group">
+              <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-teal-600 transition-colors" />
               <input
                 type="text"
                 value={locationFilter}
                 onChange={(e) => setLocationFilter(e.target.value)}
-                className="w-64 pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-xl focus:ring-4 focus:ring-teal-500/20 focus:border-teal-500 focus:outline-none transition-all placeholder:text-slate-400 font-medium"
                 placeholder="Location..."
               />
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
+              className={`px-6 py-3.5 border rounded-xl flex items-center justify-center space-x-2 font-semibold transition-all ${showFilters ? 'bg-teal-50 border-teal-200 text-teal-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'}`}
             >
               <Filter className="w-5 h-5" />
               <span>Filters</span>
@@ -144,13 +150,13 @@ export const JobSearch: React.FC = () => {
           </div>
 
           {showFilters && (
-            <div className="flex space-x-4 pt-4 border-t border-gray-200">
+            <div className="flex space-x-4 pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2">
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none bg-slate-50 text-slate-700 font-medium"
               >
-                <option value="all">All Types</option>
+                <option value="all">All Job Types</option>
                 <option value="full-time">Full-time</option>
                 <option value="part-time">Part-time</option>
                 <option value="contract">Contract</option>
@@ -162,130 +168,133 @@ export const JobSearch: React.FC = () => {
       </div>
 
       {/* Results Summary */}
-      <div className="flex items-center justify-between">
-        <p className="text-gray-600">{filteredJobs.length} jobs found</p>
-        <div className="flex space-x-2 text-sm text-gray-600">
-          <span>Sort by:</span>
-          <button className="text-blue-600 hover:text-blue-700">
+      <div className="flex items-center justify-between px-2">
+        <p className="text-slate-600 font-medium badge bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm text-sm">
+          <span className="font-bold text-slate-900">{filteredJobs.length}</span> jobs found
+        </p>
+        <div className="flex items-center space-x-2 text-sm text-slate-500">
+          <span className="font-medium mr-2">Sort by:</span>
+          <button className="text-teal-700 font-bold hover:underline bg-teal-50 px-3 py-1 rounded-full">
             Relevance
           </button>
-          <span>•</span>
-          <button className="text-gray-600 hover:text-blue-600">Date</button>
-          <span>•</span>
-          <button className="text-gray-600 hover:text-blue-600">Salary</button>
+          <button className="text-slate-600 font-medium hover:text-teal-600 hover:bg-slate-100 px-3 py-1 rounded-full transition-colors">Date</button>
+          <button className="text-slate-600 font-medium hover:text-teal-600 hover:bg-slate-100 px-3 py-1 rounded-full transition-colors">Salary</button>
         </div>
       </div>
 
       {/* Job Listings */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         {filteredJobs.map((job: Job) => {
           const hasApplied = appliedJobIds.includes(job.id);
 
           return (
             <div
               key={job.id}
-              className="bg-white p-6 rounded-xl shadow-sm border border-gray-100"
+              className="bg-white p-6 rounded-2xl shadow-md border border-slate-100 hover:border-teal-200 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <Building2 className="w-6 h-6 text-gray-600" />
+              <div className="flex flex-col md:flex-row items-start justify-between gap-6">
+                <div className="flex-1 w-full">
+                  <div className="flex items-start space-x-5">
+                    <div className="w-16 h-16 bg-white rounded-2xl border border-slate-100 shadow-sm flex items-center justify-center group-hover:border-teal-100 group-hover:shadow-md transition-all">
+                      <Building2 className="w-8 h-8 text-slate-400 group-hover:text-teal-500 transition-colors" />
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-xl font-semibold text-gray-900">
+                      <div className="flex flex-wrap items-center gap-3 mb-2">
+                        <h3 className="text-xl font-bold font-serif text-slate-900 group-hover:text-teal-800 transition-colors">
                           {job.title}
                         </h3>
-                        {/* Match % disabled */}
+                        {job.location.toLowerCase().includes('remote') && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-600 border border-indigo-100">Remote</span>
+                        )}
                       </div>
 
-                      <div className="flex items-center space-x-2 mb-3">
-                        <h4 className="text-lg font-medium text-gray-700 flex items-center gap-1">
+                      <div className="flex items-center space-x-2 mb-4">
+                        <h4 className="text-base font-bold text-slate-700 flex items-center gap-2">
                           {job.company?.companyName || "Company"}
-                          {job.company?.verification?.status === "verified" && (
-                            <ShieldCheck className="w-4 h-4 text-blue-600" aria-label="Verified Company" />
+                          {job.company?.verification?.status === "verified" ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-full border border-emerald-200 text-[10px] font-bold text-emerald-800 uppercase tracking-wide shadow-sm">
+                              <ShieldCheck className="w-3.5 h-3.5" /> Verified
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 rounded-full border border-rose-200 text-[10px] font-bold text-rose-700 uppercase tracking-wide shadow-sm animate-pulse">
+                              <ShieldCheck className="w-3.5 h-3.5" /> Scam Risk
+                            </span>
                           )}
                         </h4>
-                        <span className="text-gray-400">•</span>
-                        <span className="text-gray-600">
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-500 text-sm font-medium">
                           {job.company?.industry || "Technology"}
                         </span>
                       </div>
 
-                      <div className="flex items-center space-x-6 text-sm text-gray-600 mb-4">
-                        <div className="flex items-center space-x-1">
-                          <MapPin className="w-4 h-4" />
-                          <span>{job.location}</span>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-500 mb-6">
+                        <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                          <MapPin className="w-4 h-4 text-slate-400" />
+                          <span className="font-medium text-slate-700">{job.location}</span>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <DollarSign className="w-4 h-4" />
-                          <span>
+                        <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                          <DollarSign className="w-4 h-4 text-slate-400" />
+                          <span className="font-medium text-slate-700">
                             ${job.salary.min.toLocaleString()} - $
                             {job.salary.max.toLocaleString()}
                           </span>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <Briefcase className="w-4 h-4" />
-                          <span className="capitalize">
+                        <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                          <Briefcase className="w-4 h-4 text-slate-400" />
+                          <span className="capitalize font-medium text-slate-700">
                             {job.type.replace("-", " ")}
                           </span>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="w-4 h-4" />
+                        <div className="flex items-center space-x-2 text-xs">
+                          <Calendar className="w-4 h-4 text-slate-400" />
                           <span>
-                            {new Date(job.postedAt).toLocaleDateString()}
+                            Posted {new Date(job.postedAt).toLocaleDateString()}
                           </span>
                         </div>
                       </div>
 
-                      <p className="text-gray-600 mb-4 line-clamp-2">
+                      <p className="text-slate-600 mb-6 line-clamp-2 leading-relaxed text-sm">
                         {job.description}
                       </p>
 
-                      <div className="flex flex-wrap gap-2 mb-4">
+                      <div className="flex flex-wrap gap-2">
                         {(job.skills || []).map((skill: string) => (
                           <span
                             key={skill}
-                            className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              //   (candidate.skills ?? []).includes(skill)
-                              //     ? "bg-green-100 text-green-800"
-                              //     : 
-                              "bg-gray-100 text-gray-700"
-                              }`}
+                            className="px-3 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm"
                           >
                             {skill}
                           </span>
                         ))}
                       </div>
-
-                      {/* Compatibility analysis disabled */}
                     </div>
                   </div>
                 </div>
 
-                <div className="ml-6 flex flex-col space-y-3">
+                <div className="flex md:flex-col items-center gap-3 w-full md:w-auto md:min-w-[160px] pt-4 md:pt-0 border-t md:border-t-0 border-slate-100 md:pl-6 md:border-l">
                   {hasApplied ? (
-                    <div className="flex items-center space-x-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg">
+                    <div className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200 cursor-default shadow-sm">
                       <CheckCircle className="w-4 h-4" />
-                      <span className="text-sm font-medium">Submitted</span>
+                      <span className="text-sm font-bold uppercase tracking-wide">Submitted</span>
                     </div>
                   ) : (
                     <button
                       onClick={() => handleApply(job)}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all font-semibold"
+                      className="w-full px-6 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all font-bold text-sm tracking-wide"
                     >
                       Submit Profile
                     </button>
                   )}
 
-                  <button className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                    Save Job
-                  </button>
+                  <div className="flex gap-2 w-full">
+                    <button className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-colors text-sm font-medium">
+                      Save
+                    </button>
 
-                  <button className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                    View Details
-                  </button>
+                    <button className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-colors text-sm font-medium">
+                      Details
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -293,13 +302,15 @@ export const JobSearch: React.FC = () => {
         })}
 
         {filteredJobs.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
-            <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-slate-200">
+            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Search className="w-10 h-10 text-slate-300" />
+            </div>
+            <h3 className="text-xl font-serif font-bold text-slate-900 mb-2">
               No jobs available right now
             </h3>
-            <p className="text-gray-600 mb-4">
-              Try adjusting your search criteria or location filters
+            <p className="text-slate-500 mb-8 max-w-sm mx-auto">
+              Try adjusting your search criteria or location filters to find more opportunities.
             </p>
             <button
               onClick={() => {
@@ -307,7 +318,7 @@ export const JobSearch: React.FC = () => {
                 setLocationFilter("");
                 setTypeFilter("all");
               }}
-              className="text-blue-600 hover:text-blue-700 font-medium"
+              className="px-6 py-2.5 bg-teal-50 text-teal-700 hover:bg-teal-100 hover:text-teal-800 rounded-lg font-bold transition-colors"
             >
               Clear all filters
             </button>

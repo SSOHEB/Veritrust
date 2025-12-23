@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { Search, FileText, CheckCircle, X } from "lucide-react";
-import type { Application, Application1 } from "../types";
+import type { Application } from "../types";
 import ApplicationCard from "./ApplicationCard";
 import { useGlobalContext } from "@/Context/useGlobalContext";
 import { useLocation } from "react-router-dom";
@@ -10,169 +10,87 @@ const CommonDashboard: React.FC = () => {
   const roleFromPath = location.pathname.startsWith("/candidate")
     ? "candidate"
     : location.pathname.startsWith("/company")
-    ? "company"
-    : null;
+      ? "company"
+      : null;
   const isCandidate = roleFromPath === "candidate";
 
-  // === Shared applications state ===
-  const [applications, setApplications] =
-    useState<Application1[]>([]);
-
   const {
-    jobWalletClient,
-    jobPublicClient,
-    companyApplications,
+    myApplication, // Candidate's applications
+    companyApplications, // Company's received applications
     updateApplicationStatus,
   } = useGlobalContext();
+
+  // Single Source of Truth: Derived from GlobalContext
+  // We do NOT copy this to local state. We use it directly.
+  const applications: Application[] = useMemo(() => {
+    return isCandidate ? (myApplication || []) : (companyApplications || []);
+  }, [isCandidate, myApplication, companyApplications]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"date" | "status" | "company">("date");
 
   // === Update application status by company ===
-  type ApplicationCardStatus =
-    | "approved"
-    | "rejected"
-    | "reviewed"
-    | "pending"
-    | "pending for proof";
-
-  const handleStatusChange = (id: string, status: ApplicationCardStatus) => {
-    // Call context function to update status in backend/contract
-    if (updateApplicationStatus && (status === "approved" || status === "rejected")) {
-      updateApplicationStatus(id, status);
+  // Status: "pending" | "reviewed" | "accepted" | "rejected"
+  const handleStatusChange = async (id: string, newStatus: Application["status"]) => {
+    if (updateApplicationStatus) {
+      await updateApplicationStatus(id, newStatus);
     }
-
-    // Only persist statuses supported by Application1
-    if (status !== "approved" && status !== "rejected" && status !== "pending") {
-      return;
-    }
-
-    setApplications((prev) =>
-      prev.map((app) => {
-        if (app.id !== id) return app;
-
-        if (status === "pending") {
-          return {
-            ...app,
-            status: "pending",
-            companyAction: null,
-          };
-        }
-
-        // status is now "approved" | "rejected"
-        return {
-          ...app,
-          status,
-          companyAction: {
-            status,
-            actionDate: new Date().toISOString(),
-          },
-        };
-      })
-    );
   };
-
-  // === Upload proof document by company ===
-  const handleFileUpload = (id: string, file: File) => {
-    setApplications((prev) =>
-      prev.map((app) =>
-        app.id === id
-          ? {
-              ...app,
-              companyAction: {
-                ...(app.companyAction ?? {
-                  status: "approved", // Ensure status is approved when uploading proof
-                  actionDate: new Date().toISOString(),
-                }),
-                proofDocument: {
-                  name: file.name,
-                  url: URL.createObjectURL(file),
-                  uploadDate: new Date().toISOString(),
-                },
-              },
-              // Keep the main status as approved
-              status: "approved",
-            }
-          : app
-      )
-    );
-  };
-
-  // === Candidate verifies the proof to finalize status ===
-  const handleVerify = (id: string) => {
-    setApplications((prev) =>
-      prev.map((app) =>
-        app.id === id
-          ? {
-              ...app,
-              status: "verified", // Change main status to verified
-              candidateVerified: true,
-              verificationDate: new Date().toISOString(),
-            }
-          : app
-      )
-    );
-  };
-
-  // === Filter and sort applications for display ===
-  // NOTE: filteredApplications is currently unused (we render role-specific lists below).
-  // const filteredApplications = useMemo(() => {
-  //   return applications
-  //     .filter((app) => {
-  //       const matchesSearch =
-  //         searchTerm === "" ||
-  //         app.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  //         app.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  //         app.candidateName.toLowerCase().includes(searchTerm.toLowerCase());
-
-  //       const matchesStatus =
-  //         statusFilter === "all" || app.status === statusFilter;
-
-  //       return matchesSearch && matchesStatus;
-  //     })
-  //     .sort((a, b) => {
-  //       switch (sortBy) {
-  //         case "date":
-  //           return (
-  //             new Date(b.appliedDate).getTime() -
-  //             new Date(a.appliedDate).getTime()
-  //           );
-  //         case "status":
-  //           return a.status.localeCompare(b.status);
-  //         case "company":
-  //           return a.companyName.localeCompare(b.companyName);
-  //         default:
-  //           return 0;
-  //       }
-  //     });
-  // }, [applications, searchTerm, statusFilter, sortBy]);
 
   // === Dashboard stats ===
+  // Derived strictly from the CURRENT render's applications list
   const stats = useMemo(() => {
     return {
       total: applications.length,
-      pending: applications.filter((a) => a.status === "pending").length,
-      approved: applications.filter((a) => a.status === "approved").length,
+      // "reviewed" maps to "Under Review" count? Or maybe keep separate bucket.
+      // UI has: Total, Under Review (pending), Verified (accepted), Needs Attention (rejected), Confirmed (also accepted/verified?)
+      // Let's map strict statuses:
+      // pending -> pending
+      // reviewed -> pending (or separate?)
+      // accepted -> verified
+      // rejected -> rejected
+
+      // Let's align with the UI buckets:
+      // "Under Review" = pending + reviewed
+      underReview: applications.filter((a) => a.status === "pending" || a.status === "reviewed").length,
+      verified: applications.filter((a) => a.status === "accepted").length,
       rejected: applications.filter((a) => a.status === "rejected").length,
-      verified: applications.filter((a) => a.status === "verified").length,
+      // "Confirmed" seems redundant with verified in this simple model, or maybe it's "accepted + candidate verified"
+      // We will map "Confirmed" to "accepted" for now to fill the bucket.
+      confirmed: applications.filter((a) => a.status === "accepted").length,
     };
   }, [applications]);
 
-  const [companyApplicationnn, setCompanyApplicationnn] =
-    useState<Application[]>();
-  const [candidateApplicationnn, setCandidateApplicationnn] =
-    useState<Application[]>();
+  // Filter and Sort logic could effectively operate on `applications` here if we wanted client-side search.
+  // The UI renders `companyApplicationnn` variable in the old code, which were just mirrors.
+  // We will render `applications` directly.
 
-  useEffect(() => {
-    if (!jobWalletClient) return;
-    if (!jobPublicClient) return;
-    if (!companyApplications) return;
+  const displayApplications = useMemo(() => {
+    return applications.filter(app => {
+      // Filter logic (search + status)
+      const matchesSearch = searchTerm === "" ||
+        (app.job?.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (app.candidate?.name || "").toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Without auth, show all available submissions.
-    setCandidateApplicationnn(companyApplications);
-    setCompanyApplicationnn(companyApplications);
-  }, [jobPublicClient, jobWalletClient, companyApplications]);
+      const matchesStatus = statusFilter === "all" || app.status === statusFilter;
+
+      // Note: UI dropdown has legacy values: "pending", "approved", "rejected", "verified"
+      // We need to fix the dropdown values to match canonical ones OR map them.
+      // Dropdown values: "pending" | "approved" (=> accepted) | "rejected" | "verified" (=> accepted?)
+
+      if (statusFilter === "all") return matchesSearch;
+
+      if (statusFilter === "pending") return matchesSearch && (app.status === "pending" || app.status === "reviewed");
+      if (statusFilter === "approved" || statusFilter === "verified") return matchesSearch && app.status === "accepted";
+      if (statusFilter === "rejected") return matchesSearch && app.status === "rejected";
+
+      return matchesSearch && matchesStatus;
+    }).sort((a, b) => {
+      if (sortBy === 'date') return new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime();
+      return 0; // simplified sort
+    });
+  }, [applications, searchTerm, statusFilter, sortBy]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
@@ -236,7 +154,7 @@ const CommonDashboard: React.FC = () => {
                   Under Review
                 </p>
                 <p className="text-2xl font-semibold text-slate-900 mt-1">
-                  {stats.pending}
+                  {stats.underReview}
                 </p>
               </div>
             </div>
@@ -252,7 +170,7 @@ const CommonDashboard: React.FC = () => {
                   Verified
                 </p>
                 <p className="text-2xl font-semibold text-slate-900 mt-1">
-                  {stats.approved}
+                  {stats.verified}
                 </p>
               </div>
             </div>
@@ -284,7 +202,7 @@ const CommonDashboard: React.FC = () => {
                   Confirmed
                 </p>
                 <p className="text-2xl font-semibold text-slate-900 mt-1">
-                  {stats.verified}
+                  {stats.confirmed}
                 </p>
               </div>
             </div>
@@ -333,63 +251,31 @@ const CommonDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Applications Grid */}
-
-        {isCandidate &&
-          (candidateApplicationnn && candidateApplicationnn.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {candidateApplicationnn.map((application) => (
-                <ApplicationCard
-                  key={application.id}
-                  application={application as any}
-                  userRole={isCandidate ? "candidate" : "company"}
-                  onStatusChange={handleStatusChange}
-                  onFileUpload={handleFileUpload}
-                  onVerify={handleVerify}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No submissions found
-              </h3>
-              <p className="text-gray-600">
-                {searchTerm || statusFilter !== "all"
-                  ? "Try adjusting your search or filters"
-                  : "No submissions available at this time"}
-              </p>
-            </div>
-          ))}
-
-        {!isCandidate &&
-          (companyApplicationnn && companyApplicationnn.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {companyApplicationnn.map((application) => (
-                <ApplicationCard
-                  key={application.id}
-                  application={application as any}
-                  userRole={isCandidate ? "candidate" : "company"}
-                  onStatusChange={handleStatusChange}
-                  onFileUpload={handleFileUpload}
-                  onVerify={handleVerify}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No submissions found
-              </h3>
-              <p className="text-gray-600">
-                {searchTerm || statusFilter !== "all"
-                  ? "Try adjusting your search or filters"
-                  : "No submissions available at this time"}
-              </p>
-            </div>
-          ))}
+        {/* Applications Grid replaced by unified display */}
+        {displayApplications.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {displayApplications.map((application) => (
+              <ApplicationCard
+                key={application.id}
+                application={application as any} // Cast safely after type alignment
+                userRole={isCandidate ? "candidate" : "company"}
+                onStatusChange={handleStatusChange}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No submissions found
+            </h3>
+            <p className="text-gray-600">
+              {searchTerm || statusFilter !== "all"
+                ? "Try adjusting your search or filters"
+                : "No submissions available at this time"}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

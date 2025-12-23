@@ -18,6 +18,17 @@ export interface Company extends User {
     status: "verified" | "unverified" | "rejected";
     verifiedAt: string;
   };
+  zkVerification?: {
+    isVerified: boolean;
+    proofId: string;
+    verifiedAt: string;
+  };
+  blockchainStamp?: {
+    txHash: string;
+    network: string; // "Simulated Ethereum"
+    blockNumber: number;
+    timestamp: string;
+  };
 }
 
 // ... (comment block)
