@@ -7,7 +7,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
-import { app } from "./firebase";
+import { app, auth } from "./firebase";
 
 export const db = getFirestore(app);
 
@@ -43,5 +43,19 @@ export async function updateUserRole(
   role: "student" | "recruiter"
 ): Promise<void> {
   const userRef = doc(db, "users", uid);
-  await updateDoc(userRef, { role });
+
+  // Prepare data payload
+  const data: any = { role };
+
+  // If we have the current user in auth context, backfill basic info 
+  // in case the document is being created for the first time
+  if (auth.currentUser && auth.currentUser.uid === uid) {
+    data.uid = uid;
+    data.email = auth.currentUser.email || null;
+    data.name = auth.currentUser.displayName || null;
+    // Note: We don't set createdAt here to avoid overwriting it if it exists, 
+    // and because we don't want to read-before-write if we can avoid it.
+  }
+
+  await setDoc(userRef, data, { merge: true });
 }
