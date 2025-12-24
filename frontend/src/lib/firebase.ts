@@ -3,13 +3,13 @@ import { getAuth } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: "AIzaSyCz3k5ndz7LiiKLp1xyZFTUiE01QdlPFZA",
+  authDomain: "veritrust-hackathon.firebaseapp.com",
+  projectId: "veritrust-hackathon",
+  storageBucket: "veritrust-hackathon.firebasestorage.app",
+  messagingSenderId: "843843366406",
+  appId: "1:843843366406:web:0862c0a86335bf56235d87",
+  measurementId: "G-GZPBFQXJTS",
 };
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);

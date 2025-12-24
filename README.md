@@ -42,22 +42,7 @@ By combining the ease of **Firebase** for real-time data with **Smart Contracts*
     npm install
     ```
 
-3.  **Environment Configuration**
-    Create a `.env` file in the `client` directory with your Firebase configuration keys.
-    ```env
-    VITE_FIREBASE_API_KEY=your_api_key
-    VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
-    VITE_FIREBASE_PROJECT_ID=your_project_id
-    VITE_FIREBASE_STORAGE_BUCKET=your_project_id.firebasestorage.app
-    VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-    VITE_FIREBASE_APP_ID=your_app_id
-    VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
-    ```
-
-4.  **Run the application**
-    ```bash
-    npm run dev
-    ```
+3.  **Run the application**
 
 ## 📄 Smart Contracts
 
