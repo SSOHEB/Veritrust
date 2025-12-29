@@ -4,7 +4,6 @@ import {
   getDoc,
   setDoc,
   serverTimestamp,
-  updateDoc,
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { app, auth } from "./firebase";
