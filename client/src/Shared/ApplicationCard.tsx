@@ -4,9 +4,12 @@ import {
   MapPin,
   Check,
   X,
+  Clock,
+  Eye,
+  ShieldCheck
 } from "lucide-react";
 
-import type { Application } from "@/types";
+import { type Application, ApplicationStatus } from "@/types";
 
 interface ApplicationCardProps {
   application: Application;
@@ -22,42 +25,44 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({
   userRole,
   onStatusChange,
 }) => {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "reviewed":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      case "accepted": // Canonical "Verified/Approved"
-        return "bg-green-100 text-green-800 border-green-200";
-      case "rejected":
-        return "bg-red-100 text-red-800 border-red-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+
+  const statusConfig = {
+    [ApplicationStatus.APPLIED]: {
+      label: "Pending Review",
+      color: "bg-amber-100 text-amber-800 border-amber-200",
+      icon: Clock
+    },
+    [ApplicationStatus.UNDER_REVIEW]: {
+      label: "Under Review",
+      color: "bg-blue-100 text-blue-800 border-blue-200",
+      icon: Eye
+    },
+    [ApplicationStatus.ACCEPTED]: {
+      label: "Verified",
+      color: "bg-emerald-100 text-emerald-800 border-emerald-200",
+      icon: ShieldCheck
+    },
+    [ApplicationStatus.REJECTED]: {
+      label: "Needs Attention",
+      color: "bg-rose-100 text-rose-800 border-rose-200",
+      icon: X
+    },
+    [ApplicationStatus.EXAM_INVITED]: {
+      label: "Exam Invited",
+      color: "bg-purple-100 text-purple-800 border-purple-200",
+      icon: Eye
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "Under Review";
-      case "reviewed":
-        return "Credential Review";
-      case "accepted":
-        return "Verified";
-      case "rejected":
-        return "Needs Attention";
-      default:
-        return status;
-    }
-  };
+  // Safe accessor for status config
+  const currentConfig = statusConfig[application.status as ApplicationStatus] || statusConfig[ApplicationStatus.APPLIED];
 
-  // Company can take actions when status is pending
-  const canShowCompanyActions =
-    userRole === "company" && application.status === "pending";
+  // Company Actions Logic
+  const canShowCompanyActions = userRole === "company";
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between gap-4">
+    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col h-full">
+      <div className="flex items-start justify-between gap-4 mb-4">
         <div className="min-w-0">
           <h3 className="text-lg font-semibold text-slate-900 leading-snug truncate">
             {application.job.title}
@@ -68,15 +73,14 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({
         </div>
 
         <span
-          className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(
-            application.status
-          )}`}
+          className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${currentConfig.color}`}
         >
-          {getStatusLabel(application.status)}
+          {currentConfig.label}
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-600">
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-600 mb-4">
         <div className="flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
           <MapPin className="w-4 h-4 text-slate-500" />
           <span className="truncate">{application.job.location || "-"}</span>
@@ -89,7 +93,7 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-100 bg-white">
+      <div className="rounded-xl border border-slate-100 bg-white mb-4 flex-grow">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between gap-4">
             <p className="text-sm text-slate-700 truncate">
@@ -99,58 +103,66 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({
           </div>
           <p className="text-sm text-slate-600 truncate mt-1">
             <span className="font-semibold text-slate-900">Email:</span>{" "}
-            {application.candidate.candidateId || "-"}
+            {application.candidate.candidateId || application.candidate.email || "-"}
           </p>
         </div>
       </div>
 
-      {/* Company Actions - Only show when status is pending */}
-      {canShowCompanyActions && (
-        <div className="mb-4">
-          <p className="text-sm font-medium text-gray-700 mb-3">
-            Review Submission:
-          </p>
-          <div className="flex gap-3">
-            <button
-              // Directly mark as accepted (Verified)
-              onClick={() => onStatusChange(application.id, "accepted")}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 text-sm font-medium"
-            >
-              <Check className="w-4 h-4" />
-              Mark Verified
-            </button>
-            <button
-              onClick={() => onStatusChange(application.id, "rejected")}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 text-sm font-medium"
-            >
-              <X className="w-4 h-4" />
-              Needs Attention
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Company Actions */}
+      {
+        canShowCompanyActions && (
+          <div className="mt-auto border-t border-slate-100 pt-4">
+            {application.status === ApplicationStatus.APPLIED && (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => onStatusChange(application.id, ApplicationStatus.UNDER_REVIEW)}
+                  className="flex justify-center items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
+                >
+                  Review
+                </button>
+                <button
+                  onClick={() => onStatusChange(application.id, ApplicationStatus.REJECTED)}
+                  className="flex justify-center items-center gap-2 px-3 py-2 bg-white border border-rose-200 text-rose-700 rounded-lg hover:bg-rose-50 transition-colors text-sm font-medium"
+                >
+                  Reject
+                </button>
+              </div>
+            )}
 
-      {/* Status History - Simplified for canonical type */}
-      <div className="mt-4 pt-4 border-t border-gray-200">
-        <h4 className="text-sm font-medium text-gray-700 mb-2">
-          Submission Details
-        </h4>
-        <div className="space-y-2">
-          <div className="flex justify-between text-xs text-gray-600">
-            <span>Profile submitted</span>
-            <span>
-              {new Date(application.appliedAt).toLocaleDateString()}
-            </span>
+            {application.status === ApplicationStatus.UNDER_REVIEW && (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => onStatusChange(application.id, ApplicationStatus.ACCEPTED)}
+                  className="flex justify-center items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm"
+                >
+                  <Check className="w-4 h-4" /> Verify
+                </button>
+                <button
+                  onClick={() => onStatusChange(application.id, ApplicationStatus.REJECTED)}
+                  className="flex justify-center items-center gap-2 px-3 py-2 bg-white border border-rose-200 text-rose-700 rounded-lg hover:bg-rose-50 transition-colors text-sm font-medium"
+                >
+                  Needs Info
+                </button>
+              </div>
+            )}
+
+            {(application.status === ApplicationStatus.ACCEPTED || application.status === ApplicationStatus.REJECTED) && (
+              <p className="text-center text-xs text-slate-400 font-medium italic">
+                {application.status === ApplicationStatus.ACCEPTED ? "Application Verified" : "Application Rejected"}
+              </p>
+            )}
           </div>
-          <div className="flex justify-between text-xs text-gray-600">
-            <span>Current Status</span>
-            <span className="capitalize">
-              {application.status}
-            </span>
-          </div>
+        )
+      }
+
+      {/* Status History / Details text */}
+      <div className="mt-4 pt-3 border-t border-gray-100">
+        <div className="flex justify-between text-xs text-slate-500">
+          <span>Status</span>
+          <span className="font-semibold text-slate-700">{currentConfig.label}</span>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

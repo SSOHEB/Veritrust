@@ -1,6 +1,6 @@
 import { useGlobalContext } from "@/Context/useGlobalContext";
-import type { Application } from "@/types";
-import { Clock, CheckCircle, Mail, User, MapPin, Star } from "lucide-react";
+import { ApplicationStatus, type Application } from "@/types";
+import { Clock, CheckCircle, Mail, User, MapPin, Star, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 export const ApplicationTracking: React.FC = () => {
@@ -11,31 +11,36 @@ export const ApplicationTracking: React.FC = () => {
   const { companyApplications, updateApplicationStatus } = useGlobalContext();
 
   const statusConfig = {
-    pending: {
+    [ApplicationStatus.APPLIED]: { // "pending"
       icon: Clock,
       color: "bg-slate-100 text-slate-700 border border-slate-200",
       label: "Pending Review",
     },
-    reviewed: {
+    [ApplicationStatus.UNDER_REVIEW]: { // "reviewed"
       icon: CheckCircle,
       color: "bg-blue-50 text-blue-800 border border-blue-200",
       label: "Under Review",
     },
-    accepted: {
+    [ApplicationStatus.ACCEPTED]: { // "accepted"
       icon: Star,
       color: "bg-emerald-50 text-emerald-800 border border-emerald-200",
-      label: "Verified Candidate",
+      label: "Accepted",
     },
-    rejected: {
+    [ApplicationStatus.REJECTED]: { // "rejected"
       icon: User,
       color: "bg-rose-50 text-rose-800 border border-rose-200",
-      label: "Needs Attention",
+      label: "Rejected",
     },
+    [ApplicationStatus.EXAM_INVITED]: { // "exam_invited"
+      icon: Mail,
+      color: "bg-purple-50 text-purple-800 border border-purple-200",
+      label: "Exam Invited"
+    }
   };
 
   const handleStatusUpdate = async (
     applicationId: string,
-    newStatus: Application["status"]
+    newStatus: ApplicationStatus
   ) => {
     if (updateApplicationStatus) {
       await updateApplicationStatus(applicationId, newStatus);
@@ -112,12 +117,14 @@ export const ApplicationTracking: React.FC = () => {
             .filter(app => selectedStatus === 'all' || app.status === selectedStatus)
             .map((application) => {
               // Default to pending if status is unknown/invalid
-              const statusKey = (statusConfig[application.status as keyof typeof statusConfig] ? application.status : "pending") as keyof typeof statusConfig;
+              const statusKey = (statusConfig[application.status as ApplicationStatus] ? application.status : ApplicationStatus.APPLIED) as ApplicationStatus;
 
               const StatusIcon = statusConfig[statusKey]?.icon || User;
               const statusStyle =
                 statusConfig[statusKey]?.color ||
                 "bg-slate-100 text-slate-800";
+
+              const isVerified = application.candidate.verification?.status === "verified";
 
               return (
                 <div
@@ -127,15 +134,31 @@ export const ApplicationTracking: React.FC = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-4 mb-4">
-                        <div className="w-12 h-12 bg-[#0B1F3A] rounded-lg flex items-center justify-center shadow-sm">
+                        <div className="w-12 h-12 bg-[#0B1F3A] rounded-lg flex items-center justify-center shadow-sm relative">
                           <span className="text-white font-serif font-semibold text-lg">
                             {(application.candidate.name ?? "?").charAt(0)}
                           </span>
+                          {isVerified && (
+                            <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm">
+                              <ShieldCheck className="w-4 h-4 text-emerald-500 fill-emerald-50" />
+                            </div>
+                          )}
                         </div>
                         <div>
-                          <h3 className="text-xl font-serif font-bold text-slate-900">
-                            {application.candidate.name}
-                          </h3>
+                          <div className="flex items-center space-x-2">
+                            <h3 className="text-xl font-serif font-bold text-slate-900">
+                              {application.candidate.name}
+                            </h3>
+                            {isVerified ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wide">
+                                <ShieldCheck className="w-3 h-3 mr-1" /> Verified
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200 uppercase tracking-wide">
+                                Unverified
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-slate-500 font-mono mt-0.5">
                             ID: {application.id.slice(0, 8)}
                           </p>
@@ -207,11 +230,11 @@ export const ApplicationTracking: React.FC = () => {
                       </span>
 
                       <div className="flex flex-col space-y-2 w-full pt-2">
-                        {application.status === "pending" && (
+                        {application.status === ApplicationStatus.APPLIED && (
                           <>
                             <button
                               onClick={() =>
-                                handleStatusUpdate(application.id, "reviewed")
+                                handleStatusUpdate(application.id, ApplicationStatus.UNDER_REVIEW)
                               }
                               className="w-full px-4 py-2 bg-[#0B1F3A] text-white rounded-lg hover:bg-[#1E293B] transition-colors text-sm font-medium shadow-sm"
                             >
@@ -219,7 +242,7 @@ export const ApplicationTracking: React.FC = () => {
                             </button>
                             <button
                               onClick={() =>
-                                handleStatusUpdate(application.id, "rejected")
+                                handleStatusUpdate(application.id, ApplicationStatus.REJECTED)
                               }
                               className="w-full px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium"
                             >
@@ -228,23 +251,23 @@ export const ApplicationTracking: React.FC = () => {
                           </>
                         )}
 
-                        {(application.status === "reviewed" || application.status === "pending") && (
+                        {(application.status === ApplicationStatus.UNDER_REVIEW || application.status === ApplicationStatus.APPLIED) && (
                           <>
-                            {application.status === "reviewed" && (
+                            {application.status === ApplicationStatus.UNDER_REVIEW && (
                               <button
                                 onClick={() =>
-                                  handleStatusUpdate(application.id, "accepted")
+                                  handleStatusUpdate(application.id, ApplicationStatus.ACCEPTED)
                                 }
                                 className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm"
                               >
-                                Verify Candidate
+                                Accept Application
                               </button>
                             )}
 
-                            {application.status === "reviewed" && (
+                            {application.status === ApplicationStatus.UNDER_REVIEW && (
                               <button
                                 onClick={() =>
-                                  handleStatusUpdate(application.id, "rejected")
+                                  handleStatusUpdate(application.id, ApplicationStatus.REJECTED)
                                 }
                                 className="w-full px-4 py-2 bg-white border border-rose-200 text-rose-700 rounded-lg hover:bg-rose-50 transition-colors text-sm font-medium"
                               >
@@ -297,6 +320,12 @@ export const ApplicationTracking: React.FC = () => {
                   <h3 className="text-2xl font-serif font-bold text-slate-900">
                     {selectedApplication.candidate.name}
                   </h3>
+                  {/* Verification Badge in Modal */}
+                  {(selectedApplication.candidate.verification?.status === "verified") && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wide mt-1">
+                      <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Verified Candidate (ZK Proof)
+                    </span>
+                  )}
                   <p className="text-slate-600 mt-1">
                     {selectedApplication.job?.title || "Applicant"}
                   </p>

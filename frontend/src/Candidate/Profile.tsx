@@ -829,6 +829,7 @@ Location: ${candidate.location}
             </p>
           </div>
         )}
+      </div>
     </form>
   );
 };

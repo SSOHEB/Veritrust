@@ -27,7 +27,8 @@ export const JobSearch: React.FC = () => {
   const {
     user,
     allJobs,
-    myApplication
+    myApplication,
+    verifiedCompanyIds
   } = useGlobalContext();
 
   const appliedJobIds = (myApplication || []).map((app) => app.jobId);
@@ -211,7 +212,7 @@ export const JobSearch: React.FC = () => {
                       <div className="flex items-center space-x-2 mb-4">
                         <h4 className="text-base font-bold text-slate-700 flex items-center gap-2">
                           {job.company?.companyName || "Company"}
-                          {job.company?.verification?.status === "verified" ? (
+                          {(job.company?.verification?.status === "verified" || verifiedCompanyIds?.includes(job.companyId)) ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-full border border-emerald-200 text-[10px] font-bold text-emerald-800 uppercase tracking-wide shadow-sm">
                               <ShieldCheck className="w-3.5 h-3.5" /> Verified
                             </span>

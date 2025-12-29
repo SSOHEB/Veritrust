@@ -230,10 +230,9 @@ const CommonDashboard: React.FC = () => {
                 className="px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Status</option>
-                <option value="pending">Under Review</option>
+                <option value="pending">Pending & Reviewing</option>
                 <option value="approved">Verified</option>
                 <option value="rejected">Needs Attention</option>
-                <option value="verified">Confirmed</option>
               </select>
 
               <select
@@ -276,6 +275,8 @@ const CommonDashboard: React.FC = () => {
             </p>
           </div>
         )}
+
+
       </div>
     </div>
   );

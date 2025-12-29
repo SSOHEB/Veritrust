@@ -1,4 +1,5 @@
-import type { Application } from "../types";
+import { ApplicationStatus } from "@/types";
+import type { Application } from "@/types";
 import {
   Clock,
   CheckCircle,
@@ -9,54 +10,62 @@ import {
 } from "lucide-react";
 import { useGlobalContext } from "@/Context/useGlobalContext";
 
-export const ApplicationStatus: React.FC = () => {
-  // Keep in sync with Application["status"] in types/index.ts
-  type StatusKey = "pending" | "reviewed" | "accepted" | "rejected";
+export const ApplicationStatusComp: React.FC = () => {
 
-  const statusConfig: Record<
-    StatusKey,
-    {
-      icon: React.FC<any>;
-      color: string;
-      label: string;
-      description: string;
-    }
-  > = {
-    pending: {
+  const statusConfig = {
+    [ApplicationStatus.APPLIED]: { // "pending"
       icon: Clock,
       color: "bg-amber-50 text-amber-800 border-amber-200",
       label: "Pending Review",
       description: "Your profile submission has been received and is awaiting review.",
     },
-    reviewed: {
+    [ApplicationStatus.UNDER_REVIEW]: { // "reviewed"
       icon: CheckCircle,
       color: "bg-teal-50 text-teal-800 border-teal-200",
       label: "Under Review",
       description: "Your profile is currently being reviewed by the hiring team.",
     },
-    accepted: {
+    [ApplicationStatus.ACCEPTED]: { // "accepted"
       icon: FileText,
       color: "bg-emerald-50 text-emerald-800 border-emerald-200",
-      label: "Verified Candidate",
-      description: "Congratulations! Your application has been accepted and profile verified.",
+      label: "Accepted",
+      description: "Congratulations! Your application has been accepted. The recruiter will contact you.",
     },
-    rejected: {
+    [ApplicationStatus.REJECTED]: { // "rejected"
       icon: Clock,
       color: "bg-rose-50 text-rose-800 border-rose-200",
       label: "Needs Attention",
       description:
         "Your application requires attention or was not selected for this role.",
     },
+    [ApplicationStatus.EXAM_INVITED]: {
+      icon: FileText,
+      color: "bg-purple-50 text-purple-800 border-purple-200",
+      label: "Exam Invited",
+      description: "You have been invited to take an exam."
+    }
   };
 
-  const getStatusSteps = (currentStatus: StatusKey) => {
-    const steps: StatusKey[] = ["pending", "reviewed", "accepted"];
+  const getStatusSteps = (currentStatus: ApplicationStatus) => {
+    // Defines the linear progression
+    const steps: ApplicationStatus[] = [ApplicationStatus.APPLIED, ApplicationStatus.UNDER_REVIEW, ApplicationStatus.ACCEPTED];
 
-    if (currentStatus === "rejected") {
-      return ["pending", "rejected"] as StatusKey[];
+    if (currentStatus === ApplicationStatus.REJECTED) {
+      return [ApplicationStatus.APPLIED, ApplicationStatus.REJECTED];
     }
 
+    if (currentStatus === ApplicationStatus.EXAM_INVITED) {
+      // Assume parallel or specialized flow, or just linear: Applied -> Exam -> Accepted? 
+      // For now, treat it as a step after Review?
+      return [ApplicationStatus.APPLIED, ApplicationStatus.UNDER_REVIEW, ApplicationStatus.EXAM_INVITED];
+    }
+
+    // Determine current step index
     const currentIndex = steps.indexOf(currentStatus);
+    if (currentIndex === -1) {
+      // Fallback for unknown states or finished states not in the main line (shouldn't happen often)
+      return steps;
+    }
     return steps.slice(0, currentIndex + 1);
   };
 
@@ -96,10 +105,16 @@ export const ApplicationStatus: React.FC = () => {
         <div className="space-y-8">
           {validApplications.map((application: Application) => {
             // Default to pending if status is unknown/invalid
-            const statusKey = (statusConfig[application.status as StatusKey] ? application.status : "pending") as StatusKey;
+            const statusKey = (statusConfig[application.status] ? application.status : ApplicationStatus.APPLIED) as ApplicationStatus;
             const statusInfo = statusConfig[statusKey];
             const StatusIcon = statusInfo.icon;
-            const statusSteps = getStatusSteps(statusKey);
+
+            // For timeline visualization
+            const stepsToDisplay = statusKey === ApplicationStatus.REJECTED
+              ? [ApplicationStatus.APPLIED, ApplicationStatus.REJECTED]
+              : [ApplicationStatus.APPLIED, ApplicationStatus.UNDER_REVIEW, ApplicationStatus.ACCEPTED];
+
+            const currentProgressSteps = getStatusSteps(statusKey);
 
             return (
               <div
@@ -173,13 +188,10 @@ export const ApplicationStatus: React.FC = () => {
 
                   <div className="relative px-6 pb-4">
                     <div className="flex justify-between relative z-10">
-                      {(statusKey === "rejected"
-                        ? (["pending", "rejected"] as StatusKey[])
-                        : (["pending", "reviewed", "accepted"] as StatusKey[])
-                      ).map((step) => {
-                        const isCompleted = statusSteps.includes(step);
+                      {stepsToDisplay.map((step) => {
+                        const isCompleted = currentProgressSteps.includes(step);
                         const isCurrent = statusKey === step;
-                        const stepConfig = statusConfig[step as StatusKey];
+                        const stepConfig = statusConfig[step as ApplicationStatus];
                         const StepIcon = stepConfig.icon;
 
                         return (
@@ -216,7 +228,7 @@ export const ApplicationStatus: React.FC = () => {
                     <div
                       className="absolute top-7 left-0 h-1.5 bg-gradient-to-r from-teal-400 to-emerald-500 -z-0 rounded-full mx-6 transition-all duration-700 ease-out"
                       style={{
-                        width: statusKey === 'accepted' ? '100%' : statusKey === 'reviewed' ? '50%' : '0%'
+                        width: statusKey === ApplicationStatus.ACCEPTED ? '100%' : statusKey === ApplicationStatus.UNDER_REVIEW ? '50%' : '0%'
                       }}
                     />
                   </div>

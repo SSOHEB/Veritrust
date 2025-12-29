@@ -2,7 +2,7 @@ import { initializeApp, getApp, getApps } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCz3k5ndz7LiiKLp1xyZFTUiE01QdlPFZA",
+  apiKey: "AIzaSyCwlKUemFU-oQ3XyQyuy5-eSyS_rQ6Ei88",
   authDomain: "veritrust-hackathon.firebaseapp.com",
   projectId: "veritrust-hackathon",
   storageBucket: "veritrust-hackathon.firebasestorage.app",

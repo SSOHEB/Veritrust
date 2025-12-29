@@ -1,5 +1,6 @@
-import { Building2, User, Briefcase, LogOut } from "lucide-react";
+import { Building2, User, Briefcase, LogOut, Wallet } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useGlobalContext } from "../../Context/useGlobalContext";
 
 // interface SidebarProps {
 //   activeTab: string;
@@ -9,6 +10,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { connectWallet, walletAddress } = useGlobalContext();
   const activeTab = location.pathname.split("/")[2];
 
   const roleFromPath = location.pathname.startsWith("/candidate")
@@ -137,6 +139,22 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       <div className={`p-4 border-t ${isStudent ? 'border-white/10' : isRecruiter ? 'border-white/5' : 'border-gray-200'}`}>
+        <button
+          onClick={connectWallet}
+          className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-colors mb-2 ${walletAddress
+            ? (isStudent || isRecruiter ? "bg-green-500/20 text-green-400" : "bg-green-100 text-green-700")
+            : (isStudent || isRecruiter ? "bg-white/10 hover:bg-white/20 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-900")
+            }`}
+        >
+          <Wallet className="w-4 h-4" />
+          <span className="text-sm font-medium">
+            {walletAddress
+              ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+              : "Connect Wallet"
+            }
+          </span>
+        </button>
+
         <button
           onClick={logoutClick}
           className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-colors ${logoutClass}`}

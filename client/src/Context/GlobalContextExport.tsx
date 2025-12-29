@@ -36,6 +36,9 @@ interface GlobalContextType {
   verifyCompany: () => Promise<void>;
   organization: Organization | null;
   updateOrganization: (orgData: Partial<Organization>) => Promise<void>;
+  connectWallet: () => Promise<void>;
+  walletAddress: string | null;
+  verifiedCompanyIds: string[];
 }
 
 export const GlobalContext = createContext<GlobalContextType>({
@@ -55,4 +58,7 @@ export const GlobalContext = createContext<GlobalContextType>({
   verifyCompany: async () => { },
   organization: null,
   updateOrganization: async () => { },
+  connectWallet: async () => { },
+  walletAddress: null,
+  verifiedCompanyIds: [],
 });

@@ -14,51 +14,38 @@ export interface Company extends User {
   description: string;
   website?: string;
   logo?: string;
-  verification?: {
-    status: "verified" | "unverified" | "rejected";
-    verifiedAt: string;
-  };
-  zkVerification?: {
-    isVerified: boolean;
-    proofId: string;
-    verifiedAt: string;
-  };
-  blockchainStamp?: {
-    txHash: string;
-    network: string; // "Simulated Ethereum"
-    blockNumber: number;
-    timestamp: string;
+
+  // GLOBAL VERIFICATION STATE (Single Source of Truth)
+  verification: {
+    status: "unverified" | "pending" | "verified" | "rejected";
+    lastUpdated: string;
+    targetSmartContract?: string;
+    onChainTxHash?: string;
+    zkProofId?: string;
   };
 }
 
 export interface Organization {
-  id: string; // matches User ID for now
+  id: string;
   companyName: string;
   domain: string;
   description: string;
   industry?: string;
   size?: string;
   logo?: string;
+  // Legacy support, try to migrate to Company interface where possible
   verification: {
     zkVerified: boolean;
     blockchainStamped: boolean;
     verifiedAt?: string;
+    txHash?: string;
   };
 }
 
 // ... (comment block)
 
 // Candidate data is currently consumed from multiple sources (contract + legacy UI mocks).
-// Keep the type flexible so the app can compile while we progressively align shapes.
 export interface Candidate {
-  // Contract-shaped fields
-  candidateId?: string;
-  description?: string[] | string;
-  contacts?: string[] | string;
-  education?: string[] | string;
-  resumePath?: string[] | string;
-  profileScore?: string;
-
   // Common/legacy UI fields
   id?: string;
   email?: string;
@@ -72,24 +59,26 @@ export interface Candidate {
   bio?: string;
   phone?: string;
 
-  // Verification fields
-  zkVerification?: {
-    isVerified: boolean;
-    proofId: string;
-    verifiedAt: string;
+  // GLOBAL VERIFICATION STATE
+  verification?: {
+    status: "unverified" | "pending" | "verified" | "rejected";
+    lastUpdated: string;
+    zkProofId?: string;
   };
-  blockchainStamp?: {
-    txHash: string;
-    network: string; // "Simulated Ethereum"
-    blockNumber: number;
-    timestamp: string;
-  };
+
+  // Contract-shaped fields (Legacy/Specific views)
+  candidateId?: string;
+  description?: string[] | string;
+  contacts?: string[] | string;
+  education?: string[] | string;
+  resumePath?: string[] | string;
+  profileScore?: string;
 }
 
 export interface Job {
   id: string;
   companyId: string;
-  company?: Company;
+  company?: Company; // Hydrated company profile
   title: string;
   description: string;
   requirements: string[];
@@ -110,9 +99,13 @@ export interface Application {
   id: string;
   jobId: string;
   candidateId: string;
+  companyId: string;
   job: Job;
   candidate: Candidate;
-  status: "pending" | "reviewed" | "accepted" | "rejected";
+
+  // STRICT STATE MACHINE
+  status: ApplicationStatus;
+
   appliedAt: string;
   documents?: {
     type: "interview_proof" | "offer_letter";
@@ -153,13 +146,14 @@ export interface ContractApplication {
   status: number; // enum index
 }
 
+// Deprecated / Legacy Interface (Maintain for minimal breakage until full refactor)
 export interface CompanyApplicationInterface {
   id: string;
   jobId: string;
   candidateId: string;
   job: Job;
   candidate: Candidate;
-  status: "pending" | "reviewed" | "accepted" | "rejected";
+  status: "applied" | "under_review" | "accepted" | "rejected" | "exam_invited";
   appliedAt: string;
 }
 
@@ -192,3 +186,37 @@ export interface User1 {
   email: string;
   role: "candidate" | "company";
 }
+
+// ENUMS matching Smart Contract (Using const assertions for erasableSyntaxOnly compatibility)
+// ENUMS matching Smart Contract (Using const assertions for erasableSyntaxOnly compatibility)
+export const Location = {
+  REMOTE: "remote",
+  HYBRID: "hybrid",
+  ONSITE: "onsite"
+} as const;
+export type Location = typeof Location[keyof typeof Location];
+
+export const JobType = {
+  FULL_TIME: "full-time",
+  PART_TIME: "part-time",
+  CONTRACT: "contract",
+  INTERNSHIP: "internship",
+  FREELANCE: "freelance"
+} as const;
+export type JobType = typeof JobType[keyof typeof JobType];
+
+export const JobStatus = {
+  OPEN: "active",
+  CLOSED: "closed",
+  DRAFT: "draft"
+} as const;
+export type JobStatus = typeof JobStatus[keyof typeof JobStatus];
+
+export const ApplicationStatus = {
+  APPLIED: "pending", // Legacy mapping
+  UNDER_REVIEW: "reviewed", // Legacy mapping
+  ACCEPTED: "accepted",
+  REJECTED: "rejected",
+  EXAM_INVITED: "exam_invited"
+} as const;
+export type ApplicationStatus = typeof ApplicationStatus[keyof typeof ApplicationStatus];

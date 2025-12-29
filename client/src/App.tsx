@@ -9,7 +9,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import MainLayout from "./components/Layout/MainLayout";
 import { JobSearch } from "./Candidate/JobSearch";
 import { Profile } from "./Candidate/Profile";
-import { ApplicationStatus } from "./Candidate/ApplicationStatus";
+import { ApplicationStatusComp } from "./Candidate/ApplicationStatus";
 import { CandidateOverview } from "./Candidate/CandidateOverview";
 import { ApplicationTracking } from "./Company/ApplicationTracking";
 import CompanyInfo from "./Company/CompanyInfo";
@@ -41,7 +41,7 @@ const AppContent: React.FC = () => {
         <Route index element={<CandidateOverview />} />
         <Route path="jobs" element={<JobSearch />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="applications" element={<ApplicationStatus />} />
+        <Route path="applications" element={<ApplicationStatusComp />} />
         <Route path="commondashboard" element={<CommonDashboard />} />
       </Route>
 
