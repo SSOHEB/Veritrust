@@ -65,68 +65,71 @@ export const LoginForm: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Briefcase className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Abstract Background Orbs */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+        <div className="absolute top-[20%] left-[10%] w-[500px] h-[500px] bg-violet-900/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[20%] right-[10%] w-[500px] h-[500px] bg-fuchsia-900/10 rounded-full blur-[120px] animate-pulse delay-1000" />
+      </div>
+
+      <div className="max-w-md w-full relative z-10">
+        <div className="text-center mb-10">
+          <div className="w-20 h-20 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-violet-500/20 transform rotate-3 hover:rotate-6 transition-transform duration-500">
+            <Briefcase className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">VeriTrust</h1>
-          <p className="text-gray-600 mt-2">
-            Verified hiring for students and recruiters.
+          <h1 className="text-4xl font-sans font-bold text-white tracking-tight mb-2">VeriTrust</h1>
+          <p className="text-neutral-400 text-lg font-light tracking-wide">
+            The Standard for <span className="text-violet-400 font-medium">Verified</span> Hiring
           </p>
         </div>
 
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/20 flex justify-center space-y-3 flex-col">
-          {/* <div className="flex mb-6 bg-gray-100 p-1 rounded-lg">
-            <button
-              type="button"
-              onClick={() => setUserType("candidate")}
-              className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-md transition-all ${
-                userType === "candidate"
-                  ? "bg-white shadow-sm text-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              <User className="w-4 h-4" />
-              <span className="text-sm font-medium">Candidate</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setUserType("company")}
-              className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-md transition-all ${
-                userType === "company"
-                  ? "bg-white shadow-sm text-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              <Building2 className="w-4 h-4" />
-              <span className="text-sm font-medium">Company</span>
-            </button>
-          </div> */}
+        <div className="bg-neutral-900/50 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/5 p-8 flex flex-col justify-center space-y-6">
+          <div className="text-center space-y-2 mb-2">
+            <p className="text-neutral-300 text-sm leading-relaxed">
+              Connect your professional identity to the blockchain. <br />
+              Secure, Immutable, and Trusted.
+            </p>
+          </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             <button
               onClick={handleEnter}
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 focus:ring-4 focus:ring-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white py-4 rounded-xl font-semibold text-lg shadow-lg shadow-violet-900/20 hover:shadow-violet-900/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
             >
-              {loading ? "Entering..." : "Enter VeriTrust"}
+              {loading ? (
+                <span>Establishing Connection...</span>
+              ) : (
+                <>
+                  <span>Enter VeriTrust</span>
+                  <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </>
+              )}
             </button>
           </div>
-          <div className="space-y-6">
-            <button
-              onClick={handleSignOut}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 focus:ring-4 focus:ring-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {"Sign out"}
-            </button>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">Secure sign-in powered by Google</p>
+          <div className="pt-6 border-t border-white/5">
+            <div className="flex justify-center items-center gap-2 text-xs text-neutral-500 font-mono uppercase tracking-widest">
+              <span>Secured by</span>
+              <span className="text-neutral-400 font-bold">Google Auth</span>
+              <span>•</span>
+              <span className="text-neutral-400 font-bold">Flow Blockchain</span>
             </div>
           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-8">
+          <button
+            onClick={handleSignOut}
+            className="text-neutral-500 hover:text-neutral-300 text-sm transition-colors"
+          >
+            Sign out / Switch Account
+          </button>
         </div>
       </div>
     </div>

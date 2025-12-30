@@ -47,150 +47,110 @@ export default function Option() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br flex items-center flex-col justify-center p-5">
-      <div>
-        <h1 className="text-4xl font-bold text-gray-800 mb-8 text-center">
-          Choose your account type
-        </h1>
-        <p className="text-gray-600 mb-3 text-base text-center">
-          First time here? Select whether you're a Student or a Recruiter to
-          continue.
-        </p>
+    <div className="min-h-screen bg-neutral-950 flex items-center flex-col justify-center p-5 relative overflow-hidden">
+
+      {/* Background Ambience */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-violet-900/10 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-amber-900/10 rounded-full blur-[100px] animate-pulse delay-700" />
       </div>
-      <div className="w-full max-w-3xl bg-white rounded-3xl overflow-hidden">
-        <form onSubmit={handleSubmit(onSubmit)} className="p-10">
+
+      <div className="relative z-10 w-full max-w-4xl">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-sans font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-200 via-white to-amber-200 mb-4 tracking-tight">
+            Identify Your Role
+          </h1>
+          <p className="text-neutral-400 text-lg max-w-lg mx-auto leading-relaxed">
+            Select your path to access the decentralized verification network.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)}>
           <Controller
             name="role"
             control={control}
             render={({ field, fieldState }) => (
-              <div className="mb-5">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Candidate Card */}
+              <div className="mb-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Candidate Card - Violet Theme */}
                   <div
-                    className={`relative cursor-pointer rounded-2xl border-4 p-8 transition-all duration-300 transform ${
-                      field.value === "candidate"
-                        ? "border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 shadow-2xl shadow-blue-500/30 scale-105"
-                        : "border-gray-200 bg-white shadow-lg"
-                    }`}
+                    className={`group relative cursor-pointer rounded-3xl p-8 transition-all duration-500 transform ${field.value === "candidate"
+                        ? "bg-neutral-900 border-2 border-violet-500/50 shadow-2xl shadow-violet-500/20 scale-[1.02]"
+                        : "bg-neutral-900/50 border border-neutral-800 hover:bg-neutral-800 hover:border-violet-500/30"
+                      } backdrop-blur-xl`}
                     onClick={() => field.onChange("candidate")}
                   >
-                    <div className="flex flex-col items-center text-center gap-4">
+                    <div className="flex flex-col items-center text-center gap-6">
                       <div
-                        className={`rounded-full p-4 transition-all duration-300 ${
-                          field.value === "candidate"
-                            ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-500/40"
-                            : "bg-gradient-to-br from-gray-100 to-gray-200 text-gray-500"
-                        }`}
+                        className={`rounded-2xl p-5 transition-all duration-500 ${field.value === "candidate"
+                            ? "bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white shadow-lg"
+                            : "bg-neutral-800 text-violet-400 group-hover:scale-110"
+                          }`}
                       >
-                        <svg
-                          width="32"
-                          height="32"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                          />
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 14l9-5-9-5-9 5 9 5z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
                         </svg>
                       </div>
                       <div>
-                        <h3 className="font-bold text-2xl text-gray-800 mb-2">
-                          Student
+                        <h3 className={`font-bold text-2xl mb-2 transition-colors ${field.value === 'candidate' ? 'text-white' : 'text-neutral-200 group-hover:text-white'}`}>
+                          Student / Candidate
                         </h3>
-                        <p className="text-gray-600 mb-3 text-base">
-                          Discover jobs and submit your verified profile
+                        <p className="text-neutral-400 text-sm leading-relaxed group-hover:text-neutral-300 transition-colors">
+                          Build your on-chain verified CV. <br />Apply to jobs with zero-knowledge proof credentials.
                         </p>
-                        <div className="flex justify-center gap-1">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        </div>
+                      </div>
+                      <div className="flex justify-center gap-2 mt-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-violet-500/50"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-violet-500/30"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-violet-500/10"></span>
                       </div>
                       {field.value === "candidate" && (
-                        <div className="absolute top-3 right-3 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center animate-pulse">
-                          <svg
-                            width="16"
-                            height="16"
-                            fill="none"
-                            stroke="white"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
+                        <div className="absolute top-4 right-4 w-8 h-8 bg-violet-500/20 rounded-full flex items-center justify-center animate-pulse">
+                          <svg className="w-4 h-4 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <polyline points="20 6 9 17 4 12"></polyline>
                           </svg>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Company Card */}
+                  {/* Company Card - Amber Theme */}
                   <div
-                    className={`relative cursor-pointer rounded-2xl border-4 p-8 transition-all duration-300 transform ${
-                      field.value === "company"
-                        ? "border-pink-500 bg-gradient-to-br from-pink-50 to-pink-100 shadow-2xl shadow-pink-500/30 scale-105"
-                        : "border-gray-200 bg-white shadow-lg"
-                    }`}
+                    className={`group relative cursor-pointer rounded-3xl p-8 transition-all duration-500 transform ${field.value === "company"
+                        ? "bg-neutral-900 border-2 border-amber-500/50 shadow-2xl shadow-amber-500/20 scale-[1.02]"
+                        : "bg-neutral-900/50 border border-neutral-800 hover:bg-neutral-800 hover:border-amber-500/30"
+                      } backdrop-blur-xl`}
                     onClick={() => field.onChange("company")}
                   >
-                    <div className="flex flex-col items-center text-center gap-4">
+                    <div className="flex flex-col items-center text-center gap-6">
                       <div
-                        className={`rounded-full p-4 transition-all duration-300 ${
-                          field.value === "company"
-                            ? "bg-gradient-to-br from-pink-500 to-pink-700 text-white shadow-lg shadow-pink-500/40"
-                            : "bg-gradient-to-br from-gray-100 to-gray-200 text-gray-500"
-                        }`}
+                        className={`rounded-2xl p-5 transition-all duration-500 ${field.value === "company"
+                            ? "bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg"
+                            : "bg-neutral-800 text-amber-400 group-hover:scale-110"
+                          }`}
                       >
-                        <svg
-                          width="32"
-                          height="32"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                          />
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                         </svg>
                       </div>
                       <div>
-                        <h3 className="font-bold text-2xl text-gray-800 mb-2">
-                          Recruiter
+                        <h3 className={`font-bold text-2xl mb-2 transition-colors ${field.value === 'company' ? 'text-white' : 'text-neutral-200 group-hover:text-white'}`}>
+                          Recruiter / Company
                         </h3>
-                        <p className="text-gray-600 mb-3 text-base">
-                          Create job listings and review student submissions
+                        <p className="text-neutral-400 text-sm leading-relaxed group-hover:text-neutral-300 transition-colors">
+                          Verify entity reputation on-chain. <br />Hire verified talent instantly.
                         </p>
-                        <div className="flex justify-center gap-1">
-                          <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
-                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                          <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
-                        </div>
+                      </div>
+                      <div className="flex justify-center gap-2 mt-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500/50"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500/30"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500/10"></span>
                       </div>
                       {field.value === "company" && (
-                        <div className="absolute top-3 right-3 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center animate-pulse">
-                          <svg
-                            width="16"
-                            height="16"
-                            fill="none"
-                            stroke="white"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
+                        <div className="absolute top-4 right-4 w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center animate-pulse">
+                          <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <polyline points="20 6 9 17 4 12"></polyline>
                           </svg>
                         </div>
                       )}
@@ -198,66 +158,48 @@ export default function Option() {
                   </div>
                 </div>
 
-                {/* Error Display - Now uses fieldState for better error handling */}
+                {/* Error Display */}
                 {fieldState.error && (
-                  <p className="text-red-500 text-sm font-medium mt-2">
-                    {fieldState.error.message}
-                  </p>
+                  <div className="flex justify-center mt-6 animate-fade-in-up">
+                    <p className="text-rose-400 bg-rose-500/10 px-4 py-2 rounded-lg text-sm font-medium border border-rose-500/20">
+                      ⚠️ {fieldState.error.message}
+                    </p>
+                  </div>
                 )}
               </div>
             )}
           />
 
-
           {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={!selectedRole || isSubmitting}
-            className={`w-full p-4 rounded-xl border-none text-white font-bold text-lg transition-all duration-300 transform ${
-              selectedRole === "candidate"
-                ? "bg-gradient-to-r from-blue-500 to-blue-700 shadow-lg cursor-pointer hover:shadow-xl hover:scale-105"
-                : selectedRole === "company"
-                ? "bg-gradient-to-r from-pink-500 to-pink-700 shadow-lg cursor-pointer hover:shadow-xl hover:scale-105"
-                : "bg-gradient-to-r from-gray-400 to-gray-600 opacity-60 scale-98 cursor-not-allowed"
-            }`}
-          >
-            <div className="flex items-center justify-center gap-2">
-              {isSubmitting ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Processing...
-                </>
-              ) : (
-                <>
-                  Continue as{" "}
-                  {selectedRole === "candidate"
-                    ? "Student"
-                    : selectedRole === "company"
-                    ? "Recruiter"
-                    : "..."}
-                </>
-              )}
-            </div>
-          </button>
+          <div className="max-w-md mx-auto">
+            <button
+              type="submit"
+              disabled={!selectedRole || isSubmitting}
+              className={`w-full p-4 rounded-xl font-bold text-lg transition-all duration-300 transform border border-transparent ${selectedRole === "candidate"
+                  ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:scale-[1.02]"
+                  : selectedRole === "company"
+                    ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02]"
+                    : "bg-neutral-800 text-neutral-500 border-neutral-700 cursor-not-allowed opacity-50"
+                }`}
+            >
+              <div className="flex items-center justify-center gap-3">
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Initializing Dashboard...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Continue as {selectedRole === 'candidate' ? 'Student' : selectedRole === 'company' ? 'Recruiter' : '...'}</span>
+                    {selectedRole && <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>}
+                  </>
+                )}
+              </div>
+            </button>
+            <p className="text-center text-neutral-500 text-xs mt-6">
+              VeriTrust is currently running on Flow EVM Testnet (Chain ID 545).
+            </p>
+          </div>
         </form>
       </div>
     </div>
