@@ -62,7 +62,7 @@ const CompanyInfo: React.FC = () => {
       setIsVerifying(true);
       try {
         if (verifyCompany) {
-          await verifyCompany();
+          await verifyCompany(e.target.files[0]);
         }
       } catch (error) {
         console.error("Verification failed", error);

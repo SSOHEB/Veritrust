@@ -281,7 +281,15 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Mock function to simulate uploading zk proof
+  // Helper: Compute SHA-256 Hash of a File
+  const computeFileHash = async (file: File): Promise<string> => {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await window.crypto.subtle.digest("SHA-256", buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+    return hashHex;
+  };
+
   const uploadZKProof = async (
     applicationId: string,
     proofType: string,
@@ -290,22 +298,42 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
     description: string
   ): Promise<void> => {
     console.log("uploadZKProof called", { applicationId, proofType, file, userType, description });
+    const db = getFirestore(app);
 
-    // Simulation delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      // 1. Compute File Fingerprint (Hash)
+      const fileHash = await computeFileHash(file);
+      console.log(`[VERITRUST] Computed Document Fingerprint (Hash): ${fileHash}`);
+      console.log(`[VERITRUST] Checking Registry for this fingerprint...`);
 
-    if (userType === "candidate" && user?.id) {
-      const db = getFirestore(app);
-      try {
+      // 2. Verify against "Issued Documents" Registry
+      // We check if a document with this hash exists in our "issued_documents" collection
+      const { getDoc } = await import("firebase/firestore");
+      const docRef = doc(db, "issued_documents", fileHash);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        console.error(`[VERITRUST] Verification FAILED. Hash ${fileHash} not found in registry.`);
+        alert(`Verification Failed! This document is not in the official registry.\n\nFingerprint: ${fileHash}`);
+        throw new Error("Invalid Document: Hash not found in registry.");
+      }
+
+      console.log(`[VERITRUST] Verification SUCCESS! Document found:`, docSnap.data());
+
+      // Simulation delay for "ZK Proof Generation" effect
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      if (userType === "candidate" && user?.id) {
         // Generate simulated proof data
         const zkVerificationData = {
           isVerified: true,
-          proofId: `zkp_${Math.random().toString(36).substr(2, 9)}`,
-          verifiedAt: new Date().toISOString()
+          proofId: `zkp_${fileHash.substring(0, 10)}`, // Use part of hash as proof ID
+          verifiedAt: new Date().toISOString(),
+          originalDocHash: fileHash
         };
 
         const blockchainStampData = {
-          txHash: `0x${Math.random().toString(16).substr(2, 40)}`,
+          txHash: `0x${fileHash}`, // Use hash as mock tx for now
           network: "Simulated Ethereum",
           blockNumber: Math.floor(Math.random() * 10000000),
           timestamp: new Date().toISOString()
@@ -321,13 +349,16 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
           blockchainStamp: blockchainStampData
         });
         console.log("zkVerification updated for candidate");
-      } catch (e) {
-        console.error("Error updating zkVerification:", e);
+        alert("Document Verified Successfully!");
       }
+
+    } catch (e) {
+      console.error("Error during verification:", e);
+      throw e;
     }
   };
 
-  const verifyCompany = async (): Promise<void> => {
+  const verifyCompany = async (file?: File): Promise<void> => {
     if (user?.type !== "company" || !user.id) return;
 
     if (!jobWalletClient || !walletAddress) {
@@ -335,8 +366,30 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (!file) {
+      alert("Please upload a verification document.");
+      return;
+    }
+
     try {
       console.log("Initiating blockchain verification for:", user.id);
+
+      // 0. Verify Document Hash FIRST (The "Gatekeeper")
+      const fileHash = await computeFileHash(file);
+      console.log(`[VERITRUST] Computed Company Doc Hash: ${fileHash}`);
+
+      const db = getFirestore(app);
+      const { getDoc } = await import("firebase/firestore");
+      const docRef = doc(db, "issued_documents", fileHash);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        console.error(`[VERITRUST] Company Verification FAILED. Hash ${fileHash} not found in registry.`);
+        alert(`Verification Failed! This document is not in the official registry.\n\nFingerprint: ${fileHash}`);
+        throw new Error("Invalid Document: Hash not found in registry.");
+      }
+
+      console.log("[VERITRUST] Document Validated in Registry. Proceeding to Blockchain...");
 
       // 1. Prepare Arguments for registerCompany
       // function registerCompany(string _companyId, string _image, string _name, string[] _contacts, string _description, string[] _misc, string _companyScore)
@@ -387,11 +440,12 @@ export function GlobalContextProvider({ children }: { children: ReactNode }) {
       }
 
       // 3. Update Firestore with REAL Blockchain Data
-      const db = getFirestore(app);
+      // const db = getFirestore(app); // already declared above
       const zkVerificationData = {
         isVerified: true,
-        proofId: `zkp_${Math.random().toString(36).substr(2, 9)}`, // Still simulated for now as ZK is complex
-        verifiedAt: new Date().toISOString()
+        proofId: `zkp_${fileHash.substring(0, 10)}`, // Use doc hash
+        verifiedAt: new Date().toISOString(),
+        originalDocHash: fileHash
       };
 
       const blockchainStampData = {

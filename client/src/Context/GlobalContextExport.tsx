@@ -33,7 +33,7 @@ interface GlobalContextType {
     applicationId: string,
     status: Application["status"] // "pending" | "reviewed" | "accepted" | "rejected"
   ) => Promise<void>;
-  verifyCompany: () => Promise<void>;
+  verifyCompany: (file?: File) => Promise<void>;
   organization: Organization | null;
   updateOrganization: (orgData: Partial<Organization>) => Promise<void>;
   connectWallet: () => Promise<void>;
@@ -55,7 +55,7 @@ export const GlobalContext = createContext<GlobalContextType>({
   myApplication: undefined,
   companyApplications: undefined,
   uploadZKProof: async () => { },
-  verifyCompany: async () => { },
+  verifyCompany: async (file?: File) => { },
   organization: null,
   updateOrganization: async () => { },
   connectWallet: async () => { },
