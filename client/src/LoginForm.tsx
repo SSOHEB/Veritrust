@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Briefcase } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { ShieldCheck } from "lucide-react";
 import { onAuthChange, signInWithGoogle, signOutUser } from "./lib/auth";
 
 export const LoginForm: React.FC = () => {
@@ -74,8 +74,10 @@ export const LoginForm: React.FC = () => {
 
       <div className="max-w-md w-full relative z-10">
         <div className="text-center mb-10">
-          <div className="w-20 h-20 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-violet-500/20 transform rotate-3 hover:rotate-6 transition-transform duration-500">
-            <Briefcase className="w-10 h-10 text-white" />
+          <div className="flex justify-center mb-6">
+            <div className="w-24 h-24 mx-auto mb-4 bg-emerald-600 rounded-2xl flex items-center justify-center drop-shadow-2xl hover:scale-105 transition-transform duration-500">
+              <ShieldCheck className="w-14 h-14 text-white" />
+            </div>
           </div>
           <h1 className="text-4xl font-sans font-bold text-white tracking-tight mb-2">VeriTrust</h1>
           <p className="text-neutral-400 text-lg font-light tracking-wide">

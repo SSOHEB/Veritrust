@@ -1,4 +1,4 @@
-import { Building2, User, Briefcase, LogOut, Wallet } from "lucide-react";
+import { Building2, User, Briefcase, LogOut, Wallet, ShieldCheck } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useGlobalContext } from "../../Context/useGlobalContext";
 
@@ -108,8 +108,8 @@ export const Sidebar: React.FC = () => {
     <div className={`w-64 border-r h-screen flex flex-col transition-colors duration-300 ${theme}`}>
       <div className={`p-6 border-b ${isStudent ? 'border-white/10' : isRecruiter ? 'border-white/5' : 'border-gray-200'}`}>
         <div className="flex items-center space-x-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${logoBg}`}>
-            <Briefcase className="w-6 h-6" />
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm overflow-hidden ${logoBg}`}>
+            <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
             <h1 className={`text-xl font-bold tracking-tight font-serif ${textColor}`}>VeriTrust</h1>
