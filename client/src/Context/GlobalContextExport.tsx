@@ -39,6 +39,7 @@ interface GlobalContextType {
   connectWallet: () => Promise<void>;
   walletAddress: string | null;
   verifiedCompanyIds: string[];
+  resetVerification?: () => Promise<void>;
 }
 
 export const GlobalContext = createContext<GlobalContextType>({
@@ -61,4 +62,5 @@ export const GlobalContext = createContext<GlobalContextType>({
   connectWallet: async () => { },
   walletAddress: null,
   verifiedCompanyIds: [],
+  resetVerification: async () => { },
 });

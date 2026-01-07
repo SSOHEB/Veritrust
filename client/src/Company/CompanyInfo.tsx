@@ -18,7 +18,7 @@ import type { Organization } from '../types';
 
 
 const CompanyInfo: React.FC = () => {
-  const { verifyCompany, user, organization, updateOrganization } = useGlobalContext();
+  const { verifyCompany, user, organization, updateOrganization, resetVerification } = useGlobalContext();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<Organization>>({});
   const [isVerifying, setIsVerifying] = useState(false);
@@ -104,6 +104,22 @@ const CompanyInfo: React.FC = () => {
                 OFFICIAL VERIFIED ENTITY
               </span>
             )}
+            {/* DEMO RESET BUTTON */}
+            {isVerified && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm("Reset verification status for DEMO purposes?")) {
+                    if (resetVerification) {
+                      await resetVerification();
+                    }
+                  }
+                }}
+                className="text-xs text-red-400 hover:text-red-600 underline ml-3 cursor-pointer"
+              >
+                Reset (Demo)
+              </button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
@@ -120,7 +136,22 @@ const CompanyInfo: React.FC = () => {
               <div className="relative">
                 <input
                   type="file"
-                  onChange={handleVerificationUpload}
+                  onChange={async (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setIsVerifying(true);
+                      try {
+                        if (verifyCompany) {
+                          await verifyCompany(e.target.files[0]);
+                        }
+                      } catch (error) {
+                        console.error("Verification failed", error);
+                        alert("Verification failed. Please check console.");
+                      } finally {
+                        setIsVerifying(false);
+                        e.target.value = ''; // Reset input to allow re-selecting same file
+                      }
+                    }
+                  }}
                   disabled={isVerifying}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                   accept=".pdf,.jpg,.png"

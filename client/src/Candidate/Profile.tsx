@@ -51,7 +51,7 @@ type ProfileFormData = {
 export const Profile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const { user, uploadZKProof } = useGlobalContext();
+  const { user, uploadZKProof, resetVerification } = useGlobalContext();
 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -493,6 +493,20 @@ export const Profile: React.FC = () => {
                     VERIFIED
                   </span>
                   <span className="text-[10px] text-slate-500 mt-1 font-mono">{candidate.zkVerification.verifiedAt ? new Date(candidate.zkVerification.verifiedAt).toLocaleDateString() : ""}</span>
+                  {/* DEMO RESET BUTTON */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm("Reset verification status for DEMO purposes?")) {
+                        if (resetVerification) {
+                          await resetVerification();
+                        }
+                      }
+                    }}
+                    className="text-[10px] text-red-400 hover:text-red-600 underline mt-1 cursor-pointer"
+                  >
+                    Reset (Demo)
+                  </button>
                 </div>
               ) : (
                 <label className={`cursor-pointer px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all font-semibold text-sm flex items-center gap-2 shadow-sm hover:translate-y-[-1px] ${isVerifying ? 'opacity-75 cursor-not-allowed' : ''}`}>
@@ -503,7 +517,7 @@ export const Profile: React.FC = () => {
                     disabled={isVerifying}
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
-                      if (file && user?.id) {
+                      if (file) {
                         try {
                           setIsVerifying(true);
                           await uploadZKProof(
@@ -519,6 +533,7 @@ export const Profile: React.FC = () => {
                           alert("Verification failed. Please try again.");
                         } finally {
                           setIsVerifying(false);
+                          e.target.value = ''; // Reset input to allow re-selecting same file
                         }
                       }
                     }}

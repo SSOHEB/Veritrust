@@ -59,11 +59,17 @@ export interface Candidate {
   bio?: string;
   phone?: string;
 
+
   // GLOBAL VERIFICATION STATE
   verification?: {
     status: "unverified" | "pending" | "verified" | "rejected";
     lastUpdated: string;
     zkProofId?: string;
+  };
+
+  zkVerification?: {
+    isVerified: boolean;
+    verifiedAt?: string;
   };
 
   // Contract-shaped fields (Legacy/Specific views)
