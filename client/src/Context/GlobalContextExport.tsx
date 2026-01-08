@@ -56,7 +56,7 @@ export const GlobalContext = createContext<GlobalContextType>({
   myApplication: undefined,
   companyApplications: undefined,
   uploadZKProof: async () => { },
-  verifyCompany: async (file?: File) => { },
+  verifyCompany: async () => { },
   organization: null,
   updateOrganization: async () => { },
   connectWallet: async () => { },
