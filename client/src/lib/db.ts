@@ -44,7 +44,9 @@ export async function updateUserRole(
   const userRef = doc(db, "users", uid);
 
   // Prepare data payload
-  const data: any = { role };
+  // SYNC: We must also update 'type' because GlobalContext prioritizes 'type' over 'role'.
+  const type = role === "recruiter" ? "company" : "candidate";
+  const data: any = { role, type };
 
   // If we have the current user in auth context, backfill basic info 
   // in case the document is being created for the first time
