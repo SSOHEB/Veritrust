@@ -66,8 +66,10 @@ const CompanyInfo: React.FC = () => {
         }
       } catch (error) {
         console.error("Verification failed", error);
+        alert("Verification failed. Please check console.");
       } finally {
         setIsVerifying(false);
+        e.target.value = ''; // Reset input to allow re-selecting same file
       }
     }
   };
@@ -136,22 +138,7 @@ const CompanyInfo: React.FC = () => {
               <div className="relative">
                 <input
                   type="file"
-                  onChange={async (e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      setIsVerifying(true);
-                      try {
-                        if (verifyCompany) {
-                          await verifyCompany(e.target.files[0]);
-                        }
-                      } catch (error) {
-                        console.error("Verification failed", error);
-                        alert("Verification failed. Please check console.");
-                      } finally {
-                        setIsVerifying(false);
-                        e.target.value = ''; // Reset input to allow re-selecting same file
-                      }
-                    }
-                  }}
+                  onChange={handleVerificationUpload}
                   disabled={isVerifying}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                   accept=".pdf,.jpg,.png"
